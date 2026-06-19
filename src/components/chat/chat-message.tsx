@@ -67,7 +67,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const hasCharts = charts.length > 0;
 
   return (
-    <div className={cn("flex flex-col w-full", isUser ? "items-end" : "items-center")}>
+    <div className={cn("flex flex-col w-full", isUser ? "items-end" : "items-start")}>
       {isUser ? (
         <div className="flex items-end gap-3 max-w-[75%]">
           <div className="rounded-lg px-3 py-2 text-sm bg-primary text-primary-foreground">
@@ -78,12 +78,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
         </div>
       ) : (
-        <div className={cn("flex flex-col gap-2 w-full", hasCharts ? "max-w-2xl" : "max-w-2xl")}>
+        <div className={cn("flex flex-col gap-2", hasCharts ? "max-w-2xl" : "max-w-2xl")}>
           <div className="flex gap-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs bg-muted mt-0.5">
               <Bot className="h-4 w-4" />
             </div>
-            <div className="rounded-lg px-3 py-2 text-sm bg-muted text-foreground flex-1 min-w-0">
+            <div className="rounded-lg px-3 py-2 text-sm bg-muted text-foreground">
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {textContent}
@@ -93,7 +93,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
 
           {charts.map((chart, i) => (
-            <div key={i} className="w-full bg-card border rounded-lg p-3">
+            <div key={i} className="bg-card border rounded-lg p-3">
               <Chart data={chart.data} type={chart.type} />
             </div>
           ))}

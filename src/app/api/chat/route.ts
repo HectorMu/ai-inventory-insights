@@ -18,6 +18,8 @@ import {
   proposeFulfillOrderTool,
   confirmFulfillOrderTool,
   generateChartTool,
+  proposeBulkRestockTool,
+  confirmBulkRestockTool,
 } from "@/lib/ai-tools";
 
 const provider = createOpenAI({
@@ -44,6 +46,8 @@ const agent = new ToolLoopAgent({
     propose_fulfill_order: proposeFulfillOrderTool,
     confirm_fulfill_order: confirmFulfillOrderTool,
     generate_chart: generateChartTool,
+    propose_bulk_restock: proposeBulkRestockTool,
+    confirm_bulk_restock: confirmBulkRestockTool,
   },
   allowSystemInMessages: true,
    instructions: `You are an AI inventory and sales analytics assistant with access to a live database of products and sales.
@@ -57,12 +61,15 @@ Rules:
 - Be concise, insightful, and data-driven in your responses.
 - When the data has labels and values, you can present it as markdown.
 
-RESTOCK ORDER FLOW - You MUST follow these steps ONE AT A TIME. NEVER call propose_restock_order and confirm_restock_order in the same response.
+RESTOCK ORDER FLOW - You MUST follow these steps ONE AT A TIME. NEVER call propose and confirm tools in the same response.
+
+For restocking a single product, use propose_restock_order then confirm_restock_order.
+For restocking MULTIPLE products at once (e.g., "restock 10 for each in electronics"), use propose_bulk_restock then confirm_bulk_restock instead of making multiple individual calls.
 
 Step 1: Call get_low_stock_products to find low stock items.
-Step 2: Call propose_restock_order for each item you want to restock.
+Step 2: If restocking multiple items, call propose_bulk_restock with all items at once. If restocking a single item, call propose_restock_order.
 Step 3: STOP and present the proposal to the user. Ask them to type "confirm" to proceed or "cancel" to discard. DO NOT proceed further.
-Step 4: Wait for the user's reply. Only if they say "confirm" or "yes", call confirm_restock_order.
+Step 4: Wait for the user's reply. Only if they say "confirm" or "yes", call confirm_bulk_restock or confirm_restock_order (matching the propose tool used).
 Step 5: If the user says "cancel" or "no", do NOT call any tool.
 
 FULFILL ORDER FLOW - You MUST follow these steps ONE AT A TIME. NEVER call propose_fulfill_order and confirm_fulfill_order in the same response.
