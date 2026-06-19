@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -392,9 +392,8 @@ export function SalesTable() {
             <TableBody>
               {sales && sales.length > 0 ? (
                 sales.map((sale) => (
-                  <>
+                  <React.Fragment key={sale.id}>
                     <TableRow
-                      key={sale.id}
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => toggleExpand(sale.id)}
                     >
@@ -425,13 +424,13 @@ export function SalesTable() {
                       </TableCell>
                     </TableRow>
                     {expandedSale === sale.id && (
-                      <TableRow key={`${sale.id}-detail`}>
+                      <TableRow>
                         <TableCell colSpan={5} className="p-0">
                           <SaleDetail saleId={sale.id} />
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </React.Fragment>
                 ))
               ) : (
                 <TableRow>
