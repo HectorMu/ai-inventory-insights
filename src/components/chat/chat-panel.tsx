@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useChats } from "@/hooks/use-chats";
+import { getInvalidationKeysFromMessage } from "@/lib/cache-invalidation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,7 +33,15 @@ export function ChatPanel() {
   const currentChat = chats.find((c) => c.id === activeChatId);
   const chatTitle = currentChat?.title ?? "AI Analyst";
 
-  const { messages, setMessages, sendMessage, status, error: chatError } = useChat();
+  const queryClient = useQueryClient();
+  const { messages, setMessages, sendMessage, status, error: chatError } = useChat({
+    onFinish: ({ message }) => {
+      const keysToInvalidate = getInvalidationKeysFromMessage(message);
+      for (const key of keysToInvalidate) {
+        queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
 
   useEffect(() => {
     titleSetRef.current = false;
