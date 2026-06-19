@@ -33,39 +33,27 @@ interface DynamicToolPart {
 }
 
 function extractChartsFromToolResults(message: UIMessage): ChartInfo[] {
-  const charts: ChartInfo[] = [];
-
   for (const part of message.parts) {
     if (part.type !== "dynamic-tool") continue;
     const tool = part as unknown as DynamicToolPart;
+    if (tool.toolName !== "generate_chart") continue;
     if (tool.state !== "output-available" && tool.state !== "result") continue;
 
     let output = tool.output;
     if (typeof output === "string") {
       try { output = JSON.parse(output); } catch { continue; }
     }
-    if (!Array.isArray(output) || output.length === 0) continue;
 
-    const keys = Object.keys(output[0]);
-    const labelKey = keys.find(
-      (k) => k !== "value" && k !== "revenue" && k !== "quantity" && k !== "count"
-    );
-    const valueKey = keys.find(
-      (k) => k === "value" || k === "revenue" || k === "quantity" || k === "count"
-    );
+    const result = output as { chart?: string; data?: { label: string; value: number }[] } | null;
+    if (!result?.chart || !Array.isArray(result.data) || result.data.length < 2) continue;
 
-    if (labelKey && valueKey) {
-      charts.push({
-        data: output.map((item: Record<string, unknown>) => ({
-          label: String(item[labelKey] ?? item.name ?? item.category ?? ""),
-          value: Number(item[valueKey] ?? 0),
-        })),
-        type: tool.toolName === "get_category_breakdown" ? "pie" : "bar",
-      });
-    }
+    return [{
+      data: result.data,
+      type: result.chart as "bar" | "pie",
+    }];
   }
 
-  return charts;
+  return [];
 }
 
 interface ChatMessageProps {

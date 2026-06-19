@@ -207,3 +207,18 @@ export const confirmFulfillOrderTool = dynamicTool({
     return JSON.parse(JSON.stringify(result));
   },
 });
+
+export const generateChartTool = dynamicTool({
+  description: "Create a bar or pie chart to visualize data. Call this after fetching data when the user asks for a chart, graph, visualization, breakdown, or wants to visually compare values.",
+  inputSchema: z.object({
+    type: z.enum(["bar", "pie"]).describe("bar for comparing values across categories, pie for showing proportions of a whole"),
+    data: z.array(z.object({
+      label: z.string().describe("Name/label for each bar or pie slice"),
+      value: z.number().describe("Numeric value for this item"),
+    })).min(2).describe("Array of data points to visualize (at least 2)"),
+  }),
+  execute: async (input) => {
+    const { type, data } = input as { type: "bar" | "pie"; data: { label: string; value: number }[] };
+    return { chart: type, data };
+  },
+});

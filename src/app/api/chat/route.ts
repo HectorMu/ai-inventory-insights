@@ -17,6 +17,7 @@ import {
   recentOrdersTool,
   proposeFulfillOrderTool,
   confirmFulfillOrderTool,
+  generateChartTool,
 } from "@/lib/ai-tools";
 
 const provider = createOpenAI({
@@ -42,6 +43,7 @@ const agent = new ToolLoopAgent({
     get_recent_orders: recentOrdersTool,
     propose_fulfill_order: proposeFulfillOrderTool,
     confirm_fulfill_order: confirmFulfillOrderTool,
+    generate_chart: generateChartTool,
   },
   allowSystemInMessages: true,
    instructions: `You are an AI inventory and sales analytics assistant with access to a live database of products and sales.
@@ -69,7 +71,15 @@ Step 1: Call get_recent_orders to see pending or ordered orders.
 Step 2: Call propose_fulfill_order for each order you want to fulfill.
 Step 3: STOP and present the proposal to the user. Tell them that fulfilling will add the quantity to product stock. Ask them to type "confirm" to proceed or "cancel" to discard. DO NOT proceed further.
 Step 4: Wait for the user's reply. Only if they say "confirm" or "yes", call confirm_fulfill_order.
-Step 5: If the user says "cancel" or "no", do NOT call any tool.`,
+Step 5: If the user says "cancel" or "no", do NOT call any tool.
+
+CHART FLOW - Use the generate_chart tool when the user explicitly asks for a chart, graph, visualization, or visual comparison.
+
+- First call the appropriate data tool (e.g., get_category_breakdown, get_top_products, get_sales_summary).
+- Then call generate_chart with the data to display it as a bar or pie chart.
+- Use "bar" for comparing values across categories (e.g., sales by product, top products, monthly trends).
+- Use "pie" for showing proportions of a whole (e.g., category breakdown).
+- For simple text-only answers (e.g., asking about a single product's sales), do NOT call generate_chart. Only chart when the user wants a visual representation.`,
 });
 
 export async function POST(req: Request) {
