@@ -8,7 +8,7 @@ An **AI-powered inventory and sales analytics platform** built with Next.js 16. 
 |---|---|
 | **Framework** | Next.js 16 (App Router) |
 | **UI** | React 19, shadcn/ui, Tailwind CSS v4 |
-| **Charts** | Recharts |
+
 | **Data Fetching** | TanStack React Query v5 |
 | **Database** | SQLite via better-sqlite3 |
 | **ORM** | Drizzle ORM |
@@ -17,17 +17,18 @@ An **AI-powered inventory and sales analytics platform** built with Next.js 16. 
 | **AI Model** | Llama 3.3 70B (configurable) |
 | **Forms** | react-hook-form + Zod |
 | **Markdown** | react-markdown + remark-gfm |
+| **Icons** | Lucide React |
 
 ## Features
 
 ### AI Sales Analyst Agent
-Natural-language chat interface with a resizable side panel. The agent queries your live data using **17 tools**:
+Natural-language chat interface with a resizable side panel. The agent queries your live data using **16 tools**:
 - Sales summaries grouped by product, category, day, week, month
 - Top-performing products by revenue
 - Low-stock inventory alerts with configurable threshold
 - Period-over-period sales comparison
-- Category breakdown with auto-generated bar/pie charts
-- Product search and full inventory summaries
+- Category breakdown and product search
+- Full inventory summaries
 - **Single & bulk restock orders** — propose, confirm, and track
 - **Order fulfillment** — propose and confirm, auto-updates product stock
 
@@ -55,7 +56,7 @@ Full light/dark theme support via CSS custom properties. Respects system prefere
 src/
 ├── app/
 │   ├── api/
-│   │   ├── chat/              # AI agent endpoint (ToolLoopAgent, 17 tools)
+│   │   ├── chat/              # AI agent endpoint (ToolLoopAgent, 16 tools)
 │   │   ├── sales/             # Sales list + create + detail + delete
 │   │   ├── products/          # Product CRUD
 │   │   ├── orders/            # Order CRUD + status updates
@@ -71,7 +72,7 @@ src/
 │   ├── providers.tsx          # TanStack Query provider
 │   ├── chat/
 │   │   ├── chat-panel.tsx     # Chat sidebar: history, input, messages, quick questions
-│   │   └── chat-message.tsx   # Message bubbles with markdown + inline charts
+│   │   └── chat-message.tsx   # Message bubbles with markdown
 │   ├── dashboard/
 │   │   ├── nav.tsx            # Top navigation bar
 │   │   └── kpi-cards.tsx      # KPI card grid with loading skeletons
@@ -93,7 +94,7 @@ src/
 │   ├── use-orders.ts          # Orders CRUD + fulfill
 │   └── use-chats.ts           # Chat CRUD
 ├── lib/
-│   ├── ai-tools.ts            # 17 AI tool definitions
+│   ├── ai-tools.ts            # 16 AI tool definitions
 │   ├── cache-invalidation.ts  # Mutation-to-cache-key mapping
 │   └── utils.ts               # cn(), formatCurrency(), formatDate()
 └── types/
@@ -111,7 +112,7 @@ src/
 - **chats** — `id`, `title`, `created_at`, `updated_at`
 - **chat_messages** — `id`, `chat_id`, `message_id` (unique per chat), `role`, `content`, `created_at`
 
-### AI Tools (17 total)
+### AI Tools (16 total)
 
 | Tool | Purpose |
 |---|---|
@@ -130,7 +131,6 @@ src/
 | `get_recent_orders` | Recent restock orders with statuses |
 | `propose_fulfill_order` | Preview order fulfillment (no save) |
 | `confirm_fulfill_order` | Fulfill order & add quantity to product stock |
-| `generate_chart` | Create bar or pie chart from data |
 | `propose_bulk_restock` | Preview multiple restock orders at once |
 | `confirm_bulk_restock` | Create all orders after user approval |
 
@@ -148,11 +148,6 @@ src/
 2. Calls `propose_fulfill_order` showing the order + stock impact
 3. **Stops** and asks for confirmation
 4. On user "confirm" — calls `confirm_fulfill_order` (transitions status to "fulfilled" and adds quantity to product stock)
-
-**Chart Flow:**
-1. Agent calls a data tool (e.g., `get_category_breakdown`, `get_top_products`)
-2. Calls `generate_chart` with `type: "bar"` or `type: "pie"` and the data
-3. Chart renders inline in the chat
 
 ### Cache Invalidation
 Mutation tools (confirm_restock, confirm_bulk_restock, confirm_fulfill) automatically invalidate relevant React Query caches (`orders`, `products`, `dashboard`) so the UI stays in sync after AI-driven changes.
@@ -211,7 +206,7 @@ AI_MODEL=qwen3.5:4b
 ## Example Chat Queries
 
 - *"What were my top products this quarter?"*
-- *"Show me sales by category as a chart"*
+- *"Show me sales by category"*
 - *"Which products are low in stock?"*
 - *"Compare sales this month vs last month"*
 - *"Show me the full inventory summary"*
