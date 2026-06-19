@@ -378,6 +378,15 @@ export function fulfillOrder(id: number) {
 }
 
 export function deleteOrder(id: number) {
+  const order = db
+    .select()
+    .from(schema.orders)
+    .where(eq(schema.orders.id, id))
+    .get();
+  if (!order) return;
+  if (order.status === "fulfilled") {
+    throw new Error("Cannot delete a fulfilled order");
+  }
   db.delete(schema.orders).where(eq(schema.orders.id, id)).run();
 }
 

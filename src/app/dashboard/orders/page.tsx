@@ -141,7 +141,7 @@ function DeleteOrderDialog({
         <DialogHeader>
           <DialogTitle>Delete Order</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete order #{order?.id} for {order?.productName}?
+            Are you sure you want to delete order #{order?.id} for {order?.productName}? Fulfilled orders cannot be deleted.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -251,16 +251,18 @@ export default function OrdersPage() {
                           Fulfill
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setDeletingOrder(order);
-                          setDeleteDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {order.status !== "fulfilled" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setDeletingOrder(order);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
