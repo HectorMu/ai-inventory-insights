@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Nav } from "@/components/dashboard/nav";
 import { ChatPanel } from "@/components/chat/chat-panel";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function AppLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isRoot = pathname === "/" || pathname === "/_not-found";
+
+  if (isRoot) return <>{children}</>;
+
   const [chatWidth, setChatWidth] = useState(380);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

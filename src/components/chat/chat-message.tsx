@@ -25,13 +25,21 @@ function getMessageText(message: UIMessage): string {
     .join("");
 }
 
+interface ToolInvocationPart {
+  toolInvocation: {
+    state: string;
+    result: unknown;
+    toolName: string;
+  };
+}
+
 function extractChartsFromToolResults(message: UIMessage): ChartInfo[] {
   const charts: ChartInfo[] = [];
 
   for (const part of message.parts) {
     if (part.type !== "tool-invocation") continue;
 
-    const invocation = (part as any).toolInvocation;
+    const invocation = (part as unknown as ToolInvocationPart).toolInvocation;
     if (!invocation || invocation.state !== "result") continue;
 
     const output = invocation.result;
@@ -43,7 +51,7 @@ function extractChartsFromToolResults(message: UIMessage): ChartInfo[] {
 
     if (labelKey && valueKey) {
       charts.push({
-        data: output.map((item: any) => ({
+        data: output.map((item: Record<string, unknown>) => ({
           label: String(item[labelKey] ?? item.name ?? item.category ?? ""),
           value: Number(item[valueKey] ?? 0),
         })),

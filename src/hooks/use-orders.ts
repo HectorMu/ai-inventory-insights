@@ -1,15 +1,7 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-interface Order {
-  id: number;
-  productId: number;
-  productName: string;
-  quantity: number;
-  status: string;
-  createdAt: string;
-}
+import { useQuery } from "@tanstack/react-query";
+import type { Order } from "@/types/db";
 
 async function fetchOrders(): Promise<Order[]> {
   const res = await fetch("/api/orders");

@@ -2,16 +2,14 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useChats } from "@/hooks/use-chats";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ChatMessage } from "@/components/chat/chat-message";
+import { ChatMessage as ChatMessageUI } from "@/components/chat/chat-message";
 import { Send, Plus, History, Trash2, Check, X, Pencil } from "lucide-react";
 
 export function ChatPanel() {
-  const queryClient = useQueryClient();
   const { chats, createChat, updateChat, deleteChat } = useChats();
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [input, setInput] = useState("");
@@ -32,32 +30,7 @@ export function ChatPanel() {
   const currentChat = chats.find((c) => c.id === activeChatId);
   const chatTitle = currentChat?.title ?? "AI Analyst";
 
-  const handleFinish = useCallback(
-    async (message: any) => {
-      const chatId = activeChatRef.current;
-      if (!chatId) return;
-
-      const content =
-        typeof message.content === "string"
-          ? message.content
-          : message?.parts?.find((p: any) => p.type === "text")?.text ?? "";
-
-      if (!content) return;
-
-      await fetch(`/api/chats/${chatId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "assistant", content }),
-      }).catch((err) => console.error("Failed to save assistant message:", err));
-
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-    },
-    [queryClient]
-  );
-
-  const { messages, setMessages, sendMessage, status, error: chatError } = useChat({
-    onFinish: handleFinish,
-  });
+  const { messages, setMessages, sendMessage, status, error: chatError } = useChat();
 
   useEffect(() => {
     titleSetRef.current = false;
@@ -80,16 +53,15 @@ export function ChatPanel() {
         if (!res.ok) throw new Error(`Failed to load messages (${res.status})`);
         return res.json();
       })
-      .then((msgs: any[]) => {
+      .then((msgs: { messageId: string; role: string; content: string }[]) => {
         if (cancelled) return;
         if (!Array.isArray(msgs)) throw new Error("Invalid response format");
-        const uiMsgs = msgs.map((m: any) => ({
-          id: String(m.id),
+        const uiMsgs = msgs.map((m) => ({
+          id: m.messageId,
           role: m.role,
-          content: m.content,
-          parts: [{ type: "text" as const, text: m.content }],
+          parts: JSON.parse(m.content),
         }));
-        setMessages(uiMsgs);
+        setMessages(uiMsgs as Parameters<typeof setMessages>[0]);
         setIsLoading(false);
       })
       .catch((err: Error) => {
@@ -105,8 +77,9 @@ export function ChatPanel() {
   }, [activeChatId, setMessages]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    const el = scrollRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
   }, [messages]);
 
@@ -135,19 +108,16 @@ export function ChatPanel() {
       const chatId = activeChatRef.current;
       if (!chatId) return;
 
-      await fetch(`/api/chats/${chatId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "user", content: text }),
-      }).catch((err) => console.error("Failed to save user message:", err));
-
       if (!titleSetRef.current) {
         titleSetRef.current = true;
         const shortened = text.length > 60 ? text.slice(0, 57) + "..." : text;
         updateChat({ id: chatId, title: shortened }).catch(() => {});
       }
 
-      sendMessage({ text });
+      sendMessage(
+        { text },
+        { body: { chatId } }
+      );
     },
     [sendMessage, status, updateChat]
   );
@@ -360,7 +330,7 @@ export function ChatPanel() {
         ) : (
           <div className="space-y-4">
             {messages.map((message) => (
-              <ChatMessage key={message.id} message={message as any} />
+              <ChatMessageUI key={message.id} message={message} />
             ))}
             {(status === "streaming" || status === "submitted") && (
               <div className="text-sm text-muted-foreground animate-pulse">

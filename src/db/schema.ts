@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const products = sqliteTable("products", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -41,7 +41,10 @@ export const chats = sqliteTable("chats", {
 export const chatMessages = sqliteTable("chat_messages", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   chatId: integer("chat_id").notNull().references(() => chats.id),
+  messageId: text("message_id"),
   role: text("role").notNull(),
   content: text("content").notNull(),
   createdAt: text("created_at").notNull(),
-});
+}, (table) => ({
+  messageIdIdx: uniqueIndex("idx_chat_messages_msgid").on(table.chatId, table.messageId),
+}));

@@ -370,18 +370,16 @@ export function updateChatTitle(id: number, title: string) {
     .run();
 }
 
-export function addChatMessage(chatId: number, role: string, content: string) {
+export function upsertChatMessage(chatId: number, messageId: string, role: string, content: string) {
   const now = new Date().toISOString();
-  const result = db
-    .insert(schema.chatMessages)
-    .values({ chatId, role, content, createdAt: now })
-    .returning()
-    .get();
+  db.insert(schema.chatMessages)
+    .values({ chatId, messageId, role, content, createdAt: now })
+    .onConflictDoNothing()
+    .run();
   db.update(schema.chats)
     .set({ updatedAt: now })
     .where(eq(schema.chats.id, chatId))
     .run();
-  return result;
 }
 
 export function deleteChat(id: number) {

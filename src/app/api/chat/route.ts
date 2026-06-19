@@ -1,5 +1,6 @@
 import { ToolLoopAgent, createAgentUIStreamResponse } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
+import { upsertChatMessage } from "@/db/queries";
 import {
   salesSummaryTool,
   topProductsTool,
@@ -16,13 +17,13 @@ import {
   recentOrdersTool,
 } from "@/lib/ai-tools";
 
-const groq = createOpenAI({
-  baseURL: "https://api.groq.com/openai/v1",
-  apiKey: process.env.GROQ_API_KEY ?? "",
+const provider = createOpenAI({
+  baseURL: process.env.AI_BASE_URL ?? "https://api.groq.com/openai/v1",
+  apiKey: process.env.AI_API_KEY ?? process.env.GROQ_API_KEY ?? "",
 });
 
 const agent = new ToolLoopAgent({
-  model: groq.chat("llama-3.3-70b-versatile"),
+  model: provider.chat(process.env.AI_MODEL ?? "llama-3.3-70b-versatile"),
   tools: {
     get_sales_summary: salesSummaryTool,
     get_top_products: topProductsTool,
@@ -60,10 +61,19 @@ Step 5: If the user says "cancel" or "no", do NOT call any tool.`,
 });
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages, chatId } = await req.json();
 
   return createAgentUIStreamResponse({
     agent,
     uiMessages: messages,
+    originalMessages: messages,
+    onFinish: async ({ messages: allMessages }) => {
+      if (!chatId) return;
+      for (const msg of allMessages) {
+        if (msg.parts?.length) {
+          upsertChatMessage(Number(chatId), msg.id, msg.role, JSON.stringify(msg.parts));
+        }
+      }
+    },
   });
 }
