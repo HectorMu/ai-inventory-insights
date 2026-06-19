@@ -18,8 +18,8 @@ export const salesSummaryTool = dynamicTool({
       .describe("Group results by this dimension"),
   }),
   execute: async (input) => {
-    const { from, to, groupBy } = input as { from: string; to: string; groupBy: string };
-    return getSalesSummary(from, to, groupBy as any);
+    const { from, to, groupBy } = input as { from: string; to: string; groupBy: "product" | "category" | "day" | "week" | "month" };
+    return getSalesSummary(from, to, groupBy);
   },
 });
 
@@ -37,9 +37,9 @@ export const topProductsTool = dynamicTool({
 });
 
 export const lowStockTool = dynamicTool({
-  description: "Get products with stock below a threshold",
+  description: "Get products with stock below a threshold, use 20 as default if not specified",
   inputSchema: z.object({
-    threshold: z.number().describe("Stock threshold"),
+    threshold: z.number().default(20).describe("Stock threshold"),
   }),
   execute: async (input) => {
     const { threshold } = input as { threshold: number };
