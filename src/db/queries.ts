@@ -53,7 +53,7 @@ export function getSalesSummary(from: string, to: string, groupBy: GroupBy) {
     .groupBy(groupColumn)
     .orderBy(desc(sum(schema.saleItems.unitPrice)))
     .all();
-  return JSON.parse(JSON.stringify(rows));
+  return rows
 }
 
 export function getTopProducts(from: string, to: string, limit: number) {
@@ -80,7 +80,7 @@ export function getTopProducts(from: string, to: string, limit: number) {
     .orderBy(desc(sum(schema.saleItems.unitPrice)))
     .limit(limit)
     .all();
-  return JSON.parse(JSON.stringify(rows));
+  return rows;
 }
 
 export function getLowStockProducts(threshold: number) {
@@ -90,7 +90,7 @@ export function getLowStockProducts(threshold: number) {
     .where(lte(schema.products.stock, threshold))
     .orderBy(asc(schema.products.stock))
     .all();
-  return JSON.parse(JSON.stringify(rows));
+  return rows;
 }
 
 export function getSalesComparison(
@@ -155,7 +155,7 @@ export function getCategoryBreakdown(from: string, to: string) {
     .groupBy(schema.products.category)
     .orderBy(desc(sum(schema.saleItems.unitPrice)))
     .all();
-  return JSON.parse(JSON.stringify(rows));
+  return rows;
 }
 
 export function getDashboardKPIs() {
@@ -198,7 +198,7 @@ export function getDashboardKPIs() {
 
 export function getAllProducts() {
   const rows = db.select().from(schema.products).orderBy(asc(schema.products.name)).all();
-  return JSON.parse(JSON.stringify(rows));
+  return rows;
 }
 
 export function getAllSales(from?: string, to?: string, category?: string) {
@@ -329,7 +329,7 @@ export function getAllOrders() {
     .innerJoin(schema.products, eq(schema.orders.productId, schema.products.id))
     .orderBy(desc(schema.orders.createdAt))
     .all();
-  return JSON.parse(JSON.stringify(rows));
+  return rows;
 }
 
 export function updateOrderStatus(id: number, status: string) {
