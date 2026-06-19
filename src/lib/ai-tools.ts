@@ -6,6 +6,13 @@ import {
   getLowStockProducts,
   getSalesComparison,
   getCategoryBreakdown,
+  getSaleById,
+  searchProducts,
+  getAllCategories,
+  getInventorySummary,
+  getAllProducts,
+  createOrder,
+  getAllOrders,
 } from "@/db/queries";
 
 export const salesSummaryTool = dynamicTool({
@@ -74,5 +81,95 @@ export const categoryBreakdownTool = dynamicTool({
   execute: async (input) => {
     const { from, to } = input as { from: string; to: string };
     return getCategoryBreakdown(from, to);
+  },
+});
+
+export const saleDetailTool = dynamicTool({
+  description: "Get detailed information about a specific sale including all items purchased",
+  inputSchema: z.object({
+    saleId: z.number().describe("Sale ID to look up"),
+  }),
+  execute: async (input) => {
+    const { saleId } = input as { saleId: number };
+    const sale = getSaleById(saleId);
+    if (!sale) return JSON.stringify({ error: "Sale not found" });
+    return JSON.parse(JSON.stringify(sale));
+  },
+});
+
+export const searchProductsTool = dynamicTool({
+  description: "Search products by name or category",
+  inputSchema: z.object({
+    query: z.string().describe("Search query to match product name or category"),
+  }),
+  execute: async (input) => {
+    const { query } = input as { query: string };
+    return searchProducts(query);
+  },
+});
+
+export const categoriesTool = dynamicTool({
+  description: "Get all available product categories",
+  inputSchema: z.object({}),
+  execute: async () => {
+    return getAllCategories();
+  },
+});
+
+export const inventorySummaryTool = dynamicTool({
+  description: "Get inventory summary: total products, stock count, average price, total inventory value",
+  inputSchema: z.object({}),
+  execute: async () => {
+    return getInventorySummary();
+  },
+});
+
+export const allProductsTool = dynamicTool({
+  description: "Get a list of all products with their stock levels, prices, and categories",
+  inputSchema: z.object({}),
+  execute: async () => {
+    return getAllProducts();
+  },
+});
+
+export const proposeRestockOrderTool = dynamicTool({
+  description: "Propose a restock order for a product. Does NOT save. The agent MUST stop after calling this and ask the user to confirm before calling confirm_restock_order.",
+  inputSchema: z.object({
+    productId: z.number().describe("Product ID to restock"),
+    quantity: z.number().positive().describe("Quantity to order"),
+  }),
+  execute: async (input) => {
+    const { productId, quantity } = input as { productId: number; quantity: number };
+    const products = getAllProducts();
+    const product = products.find((p: any) => p.id === productId);
+    if (!product) return JSON.stringify({ error: "Product not found" });
+    return JSON.stringify({
+      proposed: true,
+      product: { id: product.id, name: product.name, category: product.category, currentStock: product.stock },
+      quantity,
+      estimatedTotal: (product.price * quantity).toFixed(2),
+      message: `Order ${quantity} units of "${product.name}" (currently ${product.stock} in stock). Say "confirm" to create, or "cancel" to discard.`,
+    });
+  },
+});
+
+export const confirmRestockOrderTool = dynamicTool({
+  description: "Confirm and create a restock order after the user has approved the proposed order",
+  inputSchema: z.object({
+    productId: z.number().describe("Product ID to restock"),
+    quantity: z.number().positive().describe("Quantity to order"),
+  }),
+  execute: async (input) => {
+    const { productId, quantity } = input as { productId: number; quantity: number };
+    const order = createOrder(productId, quantity);
+    return JSON.parse(JSON.stringify(order));
+  },
+});
+
+export const recentOrdersTool = dynamicTool({
+  description: "Get recent restock orders and their statuses",
+  inputSchema: z.object({}),
+  execute: async () => {
+    return getAllOrders();
   },
 });

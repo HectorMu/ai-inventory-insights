@@ -1,5 +1,5 @@
 import { db, schema } from "./index";
-import { sql, eq, gte, lte, desc, asc, and, sum, count } from "drizzle-orm";
+import { sql, eq, gte, lte, desc, asc, and, or, like, sum, count } from "drizzle-orm";
 
 export type GroupBy = "product" | "category" | "day" | "week" | "month";
 
@@ -223,4 +223,177 @@ export function getAllSales(from?: string, to?: string, category?: string) {
     .all();
 
   return salesData;
+}
+
+export function getSaleById(id: number) {
+  const sale = db
+    .select({
+      id: schema.sales.id,
+      createdAt: schema.sales.createdAt,
+      total: schema.sales.total,
+    })
+    .from(schema.sales)
+    .where(eq(schema.sales.id, id))
+    .get();
+
+  if (!sale) return null;
+
+  const items = db
+    .select({
+      id: schema.saleItems.id,
+      productId: schema.saleItems.productId,
+      productName: schema.products.name,
+      productCategory: schema.products.category,
+      quantity: schema.saleItems.quantity,
+      unitPrice: schema.saleItems.unitPrice,
+    })
+    .from(schema.saleItems)
+    .innerJoin(schema.products, eq(schema.saleItems.productId, schema.products.id))
+    .where(eq(schema.saleItems.saleId, id))
+    .all();
+
+  return { ...sale, items };
+}
+
+export function searchProducts(query: string) {
+  const rows = db
+    .select()
+    .from(schema.products)
+    .where(
+      or(
+        like(schema.products.name, `%${query}%`),
+        like(schema.products.category, `%${query}%`)
+      )
+    )
+    .orderBy(asc(schema.products.name))
+    .all();
+  return JSON.parse(JSON.stringify(rows));
+}
+
+export function getAllCategories() {
+  const rows = db
+    .select({ category: schema.products.category })
+    .from(schema.products)
+    .groupBy(schema.products.category)
+    .orderBy(asc(schema.products.category))
+    .all();
+  return rows.map((r) => r.category);
+}
+
+export function getInventorySummary() {
+  const totalProducts = db.select({ count: count().mapWith(Number) }).from(schema.products).get();
+  const totalStock = db
+    .select({ value: sql`SUM(${schema.products.stock})`.mapWith(Number) })
+    .from(schema.products)
+    .get();
+  const avgPrice = db
+    .select({ value: sql`AVG(${schema.products.price})`.mapWith(Number) })
+    .from(schema.products)
+    .get();
+  const totalValue = db
+    .select({ value: sql`SUM(${schema.products.price} * ${schema.products.stock})`.mapWith(Number) })
+    .from(schema.products)
+    .get();
+
+  return {
+    totalProducts: totalProducts?.count ?? 0,
+    totalStock: totalStock?.value ?? 0,
+    avgPrice: avgPrice?.value ?? 0,
+    totalInventoryValue: totalValue?.value ?? 0,
+  };
+}
+
+export function createOrder(productId: number, quantity: number) {
+  const now = new Date().toISOString();
+  const result = db
+    .insert(schema.orders)
+    .values({ productId, quantity, status: "pending", createdAt: now })
+    .returning()
+    .get();
+  return result;
+}
+
+export function getAllOrders() {
+  const rows = db
+    .select({
+      id: schema.orders.id,
+      productId: schema.orders.productId,
+      productName: schema.products.name,
+      quantity: schema.orders.quantity,
+      status: schema.orders.status,
+      createdAt: schema.orders.createdAt,
+    })
+    .from(schema.orders)
+    .innerJoin(schema.products, eq(schema.orders.productId, schema.products.id))
+    .orderBy(desc(schema.orders.createdAt))
+    .all();
+  return JSON.parse(JSON.stringify(rows));
+}
+
+export function updateOrderStatus(id: number, status: string) {
+  const result = db
+    .update(schema.orders)
+    .set({ status })
+    .where(eq(schema.orders.id, id))
+    .returning()
+    .get();
+  return result;
+}
+
+export function createChat(title: string) {
+  const now = new Date().toISOString();
+  const result = db
+    .insert(schema.chats)
+    .values({ title, createdAt: now, updatedAt: now })
+    .returning()
+    .get();
+  return result;
+}
+
+export function getAllChats() {
+  return db
+    .select()
+    .from(schema.chats)
+    .orderBy(desc(schema.chats.updatedAt))
+    .all();
+}
+
+export function getChatById(id: number) {
+  return db.select().from(schema.chats).where(eq(schema.chats.id, id)).get();
+}
+
+export function updateChatTitle(id: number, title: string) {
+  const now = new Date().toISOString();
+  db.update(schema.chats)
+    .set({ title, updatedAt: now })
+    .where(eq(schema.chats.id, id))
+    .run();
+}
+
+export function addChatMessage(chatId: number, role: string, content: string) {
+  const now = new Date().toISOString();
+  const result = db
+    .insert(schema.chatMessages)
+    .values({ chatId, role, content, createdAt: now })
+    .returning()
+    .get();
+  db.update(schema.chats)
+    .set({ updatedAt: now })
+    .where(eq(schema.chats.id, chatId))
+    .run();
+  return result;
+}
+
+export function deleteChat(id: number) {
+  db.delete(schema.chatMessages).where(eq(schema.chatMessages.chatId, id)).run();
+  db.delete(schema.chats).where(eq(schema.chats.id, id)).run();
+}
+
+export function getChatMessages(chatId: number) {
+  return db
+    .select()
+    .from(schema.chatMessages)
+    .where(eq(schema.chatMessages.chatId, chatId))
+    .orderBy(asc(schema.chatMessages.createdAt))
+    .all();
 }

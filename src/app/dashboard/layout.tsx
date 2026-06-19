@@ -23,8 +23,7 @@ export default function DashboardLayout({
       if (!isResizing || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const newWidth = rect.right - e.clientX;
-      const clamped = Math.max(280, Math.min(800, newWidth));
-      setChatWidth(clamped);
+      setChatWidth(Math.max(280, Math.min(800, newWidth)));
     },
     [isResizing]
   );
