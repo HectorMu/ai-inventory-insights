@@ -15,6 +15,8 @@ import {
   proposeRestockOrderTool,
   confirmRestockOrderTool,
   recentOrdersTool,
+  proposeFulfillOrderTool,
+  confirmFulfillOrderTool,
 } from "@/lib/ai-tools";
 
 const provider = createOpenAI({
@@ -38,6 +40,8 @@ const agent = new ToolLoopAgent({
     propose_restock_order: proposeRestockOrderTool,
     confirm_restock_order: confirmRestockOrderTool,
     get_recent_orders: recentOrdersTool,
+    propose_fulfill_order: proposeFulfillOrderTool,
+    confirm_fulfill_order: confirmFulfillOrderTool,
   },
   allowSystemInMessages: true,
    instructions: `You are an AI inventory and sales analytics assistant with access to a live database of products and sales.
@@ -57,6 +61,14 @@ Step 1: Call get_low_stock_products to find low stock items.
 Step 2: Call propose_restock_order for each item you want to restock.
 Step 3: STOP and present the proposal to the user. Ask them to type "confirm" to proceed or "cancel" to discard. DO NOT proceed further.
 Step 4: Wait for the user's reply. Only if they say "confirm" or "yes", call confirm_restock_order.
+Step 5: If the user says "cancel" or "no", do NOT call any tool.
+
+FULFILL ORDER FLOW - You MUST follow these steps ONE AT A TIME. NEVER call propose_fulfill_order and confirm_fulfill_order in the same response.
+
+Step 1: Call get_recent_orders to see pending or ordered orders.
+Step 2: Call propose_fulfill_order for each order you want to fulfill.
+Step 3: STOP and present the proposal to the user. Tell them that fulfilling will add the quantity to product stock. Ask them to type "confirm" to proceed or "cancel" to discard. DO NOT proceed further.
+Step 4: Wait for the user's reply. Only if they say "confirm" or "yes", call confirm_fulfill_order.
 Step 5: If the user says "cancel" or "no", do NOT call any tool.`,
 });
 

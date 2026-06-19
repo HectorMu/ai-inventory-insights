@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSaleById, deleteSale } from "@/db/queries";
+import { updateProduct, deleteProduct } from "@/db/queries";
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const sale = getSaleById(Number(id));
-    if (!sale) return NextResponse.json({ error: "Sale not found" }, { status: 404 });
-    return NextResponse.json(sale);
+    const body = await request.json();
+    updateProduct(Number(id), body);
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Sale detail API error:", error);
+    console.error("Update product API error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }
@@ -16,10 +16,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    deleteSale(Number(id));
+    deleteProduct(Number(id));
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete sale API error:", error);
+    console.error("Delete product API error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }

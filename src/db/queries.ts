@@ -1,6 +1,8 @@
 import { db, schema } from "./index";
 import { sql, eq, gte, lte, desc, asc, and, or, like, sum, count } from "drizzle-orm";
 
+export type { Order, SaleDetail, SaleItem, Product } from "@/types/db";
+
 export type GroupBy = "product" | "category" | "day" | "week" | "month";
 
 export function getSalesSummary(from: string, to: string, groupBy: GroupBy) {
@@ -331,13 +333,106 @@ export function getAllOrders() {
 }
 
 export function updateOrderStatus(id: number, status: string) {
-  const result = db
-    .update(schema.orders)
-    .set({ status })
+  const order = db
+    .select()
+    .from(schema.orders)
     .where(eq(schema.orders.id, id))
+    .get();
+  if (order) {
+    db.update(schema.orders)
+      .set({ status })
+      .where(eq(schema.orders.id, id))
+      .run();
+  }
+}
+
+export function fulfillOrder(id: number) {
+  const order = db
+    .select()
+    .from(schema.orders)
+    .where(eq(schema.orders.id, id))
+    .get();
+  if (!order) return null;
+  db.update(schema.orders)
+    .set({ status: "fulfilled" })
+    .where(eq(schema.orders.id, id))
+    .run();
+  db.update(schema.products)
+    .set({ stock: sql`${schema.products.stock} + ${order.quantity}` })
+    .where(eq(schema.products.id, order.productId))
+    .run();
+  const updated = db
+    .select({
+      id: schema.orders.id,
+      productId: schema.orders.productId,
+      productName: schema.products.name,
+      quantity: schema.orders.quantity,
+      status: schema.orders.status,
+      createdAt: schema.orders.createdAt,
+    })
+    .from(schema.orders)
+    .innerJoin(schema.products, eq(schema.orders.productId, schema.products.id))
+    .where(eq(schema.orders.id, id))
+    .get();
+  return updated;
+}
+
+export function deleteOrder(id: number) {
+  db.delete(schema.orders).where(eq(schema.orders.id, id)).run();
+}
+
+export function createProduct(data: { name: string; category: string; price: number; stock: number }) {
+  const now = new Date().toISOString();
+  const result = db
+    .insert(schema.products)
+    .values({ ...data, createdAt: now })
     .returning()
     .get();
   return result;
+}
+
+export function updateProduct(id: number, data: { name: string; category: string; price: number; stock: number }) {
+  db.update(schema.products)
+    .set(data)
+    .where(eq(schema.products.id, id))
+    .run();
+}
+
+export function deleteProduct(id: number) {
+  db.delete(schema.products).where(eq(schema.products.id, id)).run();
+}
+
+export function createSale(items: { productId: number; quantity: number; unitPrice: number }[]) {
+  const now = new Date().toISOString();
+  const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  const sale = db
+    .insert(schema.sales)
+    .values({ createdAt: now, total })
+    .returning()
+    .get();
+  for (const item of items) {
+    db.insert(schema.saleItems)
+      .values({ saleId: sale.id, productId: item.productId, quantity: item.quantity, unitPrice: item.unitPrice })
+      .run();
+    db.update(schema.products)
+      .set({ stock: sql`${schema.products.stock} - ${item.quantity}` })
+      .where(eq(schema.products.id, item.productId))
+      .run();
+  }
+  return getSaleById(sale.id);
+}
+
+export function deleteSale(id: number) {
+  const sale = getSaleById(id);
+  if (!sale) return;
+  for (const item of sale.items) {
+    db.update(schema.products)
+      .set({ stock: sql`${schema.products.stock} + ${item.quantity}` })
+      .where(eq(schema.products.id, item.productId))
+      .run();
+  }
+  db.delete(schema.saleItems).where(eq(schema.saleItems.saleId, id)).run();
+  db.delete(schema.sales).where(eq(schema.sales.id, id)).run();
 }
 
 export function createChat(title: string) {

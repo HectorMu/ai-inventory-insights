@@ -21,6 +21,7 @@ export function ChatPanel() {
   const [editTitleValue, setEditTitleValue] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
   const titleSetRef = useRef(false);
   const activeChatRef = useRef<number | null>(null);
   const historyRef = useRef<HTMLDivElement>(null);
@@ -77,11 +78,12 @@ export function ChatPanel() {
   }, [activeChatId, setMessages]);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) {
+    const el = scrollViewportRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    }
-  }, [messages]);
+    });
+  }, [messages, scrollViewportRef]);
 
   useEffect(() => {
     if (isEditingTitle && editInputRef.current) {
@@ -285,7 +287,7 @@ export function ChatPanel() {
         </div>
       </div>
 
-      <ScrollArea ref={scrollRef} className="flex-1 p-4">
+      <ScrollArea ref={scrollRef} viewportRef={scrollViewportRef} className="flex-1 p-4">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="space-y-3 w-full max-w-md">

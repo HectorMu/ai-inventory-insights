@@ -13,6 +13,7 @@ import {
   getAllProducts,
   createOrder,
   getAllOrders,
+  fulfillOrder,
 } from "@/db/queries";
 
 export const salesSummaryTool = dynamicTool({
@@ -171,5 +172,38 @@ export const recentOrdersTool = dynamicTool({
   inputSchema: z.object({}),
   execute: async () => {
     return getAllOrders();
+  },
+});
+
+export const proposeFulfillOrderTool = dynamicTool({
+  description: "Propose to fulfill a pending or ordered restock order. Does NOT save. The agent MUST stop after calling this and ask the user to confirm before calling confirm_fulfill_order.",
+  inputSchema: z.object({
+    orderId: z.number().describe("Order ID to fulfill"),
+  }),
+  execute: async (input) => {
+    const { orderId } = input as { orderId: number };
+    const orders = getAllOrders();
+    const order = orders.find((o: any) => o.id === orderId);
+    if (!order) return JSON.stringify({ error: "Order not found" });
+    if (order.status === "fulfilled") return JSON.stringify({ error: "Order is already fulfilled" });
+    if (order.status === "cancelled") return JSON.stringify({ error: "Order is cancelled" });
+    return JSON.stringify({
+      proposed: true,
+      order: { id: order.id, productName: order.productName, quantity: order.quantity, status: order.status },
+      message: `Fulfill order #${order.id} for ${order.quantity} units of "${order.productName}"? This will add ${order.quantity} units to stock. Say "confirm" to proceed, or "cancel" to discard.`,
+    });
+  },
+});
+
+export const confirmFulfillOrderTool = dynamicTool({
+  description: "Confirm and fulfill a restock order after the user has approved. Transitions the order to 'fulfilled' status and adds the quantity to product stock.",
+  inputSchema: z.object({
+    orderId: z.number().describe("Order ID to fulfill"),
+  }),
+  execute: async (input) => {
+    const { orderId } = input as { orderId: number };
+    const result = fulfillOrder(orderId);
+    if (!result) return JSON.stringify({ error: "Order not found" });
+    return JSON.parse(JSON.stringify(result));
   },
 });
