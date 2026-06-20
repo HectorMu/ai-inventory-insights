@@ -22,15 +22,12 @@ An **AI-powered inventory and sales analytics platform** built with Next.js 16. 
 ## Features
 
 ### AI Sales Analyst Agent
-Natural-language chat interface with a resizable side panel. The agent queries your live data using **16 tools**:
-- Sales summaries grouped by product, category, day, week, month
-- Top-performing products by revenue
-- Low-stock inventory alerts with configurable threshold
-- Period-over-period sales comparison
-- Category breakdown and product search
-- Full inventory summaries
-- **Single & bulk restock orders** — propose, confirm, and track
-- **Order fulfillment** — propose and confirm, auto-updates product stock
+Natural-language chat interface with a resizable side panel. The agent queries your live data using **7 filterable tools**:
+- **`query_products`** — Search/filter products by name, category, stock level, price range, or get aggregate summaries
+- **`query_sales`** — Filter sales by date, category, product; group by day/week/month/product/category; drill into a specific sale
+- **`query_orders`** — Filter restock orders by status, product, or date range
+- **`compare_sales_periods`** — Compare revenue and sales count between two time periods
+- **`restock_order` / `bulk_restock` / `fulfill_order`** — Mutations with user approval (single+batch restock, fulfillment)
 
 ### Dashboard
 KPI cards showing total revenue, total sales, top product, and low stock count. Quick-action chat panel always available.
@@ -56,7 +53,7 @@ Full light/dark theme support via CSS custom properties. Respects system prefere
 src/
 ├── app/
 │   ├── api/
-│   │   ├── chat/              # AI agent endpoint (ToolLoopAgent, 16 tools)
+│   │   ├── chat/              # AI agent endpoint (ToolLoopAgent, 7 tools)
 │   │   ├── sales/             # Sales list + create + detail + delete
 │   │   ├── products/          # Product CRUD
 │   │   ├── orders/            # Order CRUD + status updates
@@ -94,7 +91,7 @@ src/
 │   ├── use-orders.ts          # Orders CRUD + fulfill
 │   └── use-chats.ts           # Chat CRUD
 ├── lib/
-│   ├── ai-tools.ts            # 16 AI tool definitions
+│   ├── ai-tools.ts            # 7 AI tool definitions (4 query + 3 mutation)
 │   ├── cache-invalidation.ts  # Mutation-to-cache-key mapping
 │   └── utils.ts               # cn(), formatCurrency(), formatDate()
 └── types/
@@ -112,45 +109,33 @@ src/
 - **chats** — `id`, `title`, `created_at`, `updated_at`
 - **chat_messages** — `id`, `chat_id`, `message_id` (unique per chat), `role`, `content`, `created_at`
 
-### AI Tools (16 total)
+### AI Tools (7 total)
 
-| Tool | Purpose |
-|---|---|
-| `get_sales_summary` | Grouped sales by product/category/day/week/month |
-| `get_top_products` | Top N products by revenue in a date range |
-| `get_low_stock_products` | Products below a stock threshold (default 20) |
-| `get_sales_comparison` | Compare two time periods |
-| `get_category_breakdown` | Sales breakdown by category |
-| `get_sale_detail` | Items inside a specific sale |
-| `search_products` | Search by name or category |
-| `get_categories` | All product categories |
-| `get_inventory_summary` | Total stock value, avg price, item count |
-| `get_all_products` | Full product list |
-| `propose_restock_order` | Preview a single restock order (no save) |
-| `confirm_restock_order` | Create the order after user approval |
-| `get_recent_orders` | Recent restock orders with statuses |
-| `propose_fulfill_order` | Preview order fulfillment (no save) |
-| `confirm_fulfill_order` | Fulfill order & add quantity to product stock |
-| `propose_bulk_restock` | Preview multiple restock orders at once |
-| `confirm_bulk_restock` | Create all orders after user approval |
+| Tool | Type | Purpose |
+|---|---|---|
+| `query_products` | Read | Search/filter products by name, category, stock range, price range; `summary` mode for aggregates |
+| `query_sales` | Read | Filter sales by date, category, product; group by product/category/day/week/month; `saleId` for detail |
+| `query_orders` | Read | Filter restock orders by status, product, or date range |
+| `compare_sales_periods` | Read | Compare revenue and sales count between two time periods |
+| `restock_order` | Mutate | Create a single restock order (requires user approval) |
+| `bulk_restock` | Mutate | Create multiple restock orders at once (requires user approval) |
+| `fulfill_order` | Mutate | Fulfill a pending order — adds quantity to product stock (requires user approval) |
 
 ### Agent Workflows
 
 **Restock Flow:**
-1. Agent calls `get_low_stock_products` to find low items
-2. Calls `propose_restock_order` (single) or `propose_bulk_restock` (multi)
-3. **Stops** and presents proposal, asks for confirmation
-4. On user "confirm" — calls `confirm_restock_order` or `confirm_bulk_restock`
-5. On "cancel" — discards
+1. Agent calls `query_products({ stockLte: 10 })` to find low items, or user requests specific products
+2. Calls `restock_order` (single) or `bulk_restock` (multi) — **system pauses automatically** for user approval
+3. On approval → order is created; on denial → discarded
+4. After success, agent asks: *"Would you like to fulfill it now?"*
 
 **Fulfill Flow:**
-1. Agent calls `get_recent_orders` to find pending/ordered orders
-2. Calls `propose_fulfill_order` showing the order + stock impact
-3. **Stops** and asks for confirmation
-4. On user "confirm" — calls `confirm_fulfill_order` (transitions status to "fulfilled" and adds quantity to product stock)
+1. Agent calls `query_orders({ status: "pending" })` to find fulfillable orders
+2. Calls `fulfill_order` — **system pauses automatically** for user approval
+3. On approval → status updates to "fulfilled" and quantity added to product stock
 
 ### Cache Invalidation
-Mutation tools (confirm_restock, confirm_bulk_restock, confirm_fulfill) automatically invalidate relevant React Query caches (`orders`, `products`, `dashboard`) so the UI stays in sync after AI-driven changes.
+Mutation tools (`restock_order`, `bulk_restock`, `fulfill_order`) automatically invalidate relevant React Query caches (`orders`, `products`, `dashboard`) so the UI stays in sync after AI-driven changes.
 
 ## Getting Started
 
