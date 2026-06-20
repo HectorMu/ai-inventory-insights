@@ -5,6 +5,7 @@ import {
   querySales,
   queryOrders,
   getSalesComparison,
+  getDailyBriefing,
   createOrder,
   fulfillOrder,
 } from "@/db/queries";
@@ -101,6 +102,19 @@ export const compareSalesPeriodsTool = dynamicTool({
   execute: async (input) => {
     const { periodA, periodB } = input as { periodA: { from: string; to: string }; periodB: { from: string; to: string } };
     return getSalesComparison(periodA, periodB);
+  },
+});
+
+export const dailyBriefingTool = dynamicTool({
+  description: `Get a consolidated daily briefing of sales, orders, low stock alerts, and inventory snapshot for a given date. Includes day-over-day revenue comparison. Defaults to yesterday if no date provided.`,
+  inputSchema: z.object({
+    date: z.string().optional().describe("Date for the briefing (YYYY-MM-DD). Defaults to yesterday."),
+  }),
+  execute: async (input: unknown) => {
+    const { date } = input as { date?: string };
+    const targetDate = date ?? new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    const result = getDailyBriefing(targetDate);
+    return JSON.parse(JSON.stringify(result));
   },
 });
 

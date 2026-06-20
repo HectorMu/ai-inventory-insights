@@ -6,6 +6,7 @@ import {
   querySalesTool,
   queryOrdersTool,
   compareSalesPeriodsTool,
+  dailyBriefingTool,
   restockOrderTool,
   bulkRestockTool,
   fulfillOrderTool,
@@ -23,6 +24,7 @@ const agent = new ToolLoopAgent({
     query_sales: querySalesTool,
     query_orders: queryOrdersTool,
     compare_sales_periods: compareSalesPeriodsTool,
+    get_daily_briefing: dailyBriefingTool,
     restock_order: restockOrderTool,
     bulk_restock: bulkRestockTool,
     fulfill_order: fulfillOrderTool,
@@ -56,11 +58,15 @@ AVAILABLE TOOLS:
    Use this for month-over-month, quarter-over-quarter, or any period comparison.
    Example: { periodA: { from: "2026-05-01", to: "2026-05-31" }, periodB: { from: "2026-04-01", to: "2026-04-30" } }
 
+5. get_daily_briefing: Get a consolidated daily briefing — sales summary, top products, day-over-day comparison, pending orders, orders created today, low stock alerts, and inventory snapshot — all in one call.
+   Defaults to yesterday if no date provided. Use this for morning check-ins or "what happened yesterday" queries.
+   Example: {} (defaults to yesterday) | { date: "2026-06-15" }
+
 --- Mutation Tools (require user approval) ---
 
-5. restock_order: Create a single restock order (needs approval).
-6. bulk_restock: Create multiple restock orders at once (needs approval).
-7. fulfill_order: Fulfill a pending order — adds quantity to product stock (needs approval).
+6. restock_order: Create a single restock order (needs approval).
+7. bulk_restock: Create multiple restock orders at once (needs approval).
+8. fulfill_order: Fulfill a pending order — adds quantity to product stock (needs approval).
 
 RULES:
 - Always call a tool when the user asks about data. NEVER just say "I would call X tool".

@@ -22,11 +22,12 @@ An **AI-powered inventory and sales analytics platform** built with Next.js 16. 
 ## Features
 
 ### AI Sales Analyst Agent
-Natural-language chat interface with a resizable side panel. The agent queries your live data using **7 filterable tools**:
+Natural-language chat interface with a resizable side panel. The agent queries your live data using **8 filterable tools**:
 - **`query_products`** — Search/filter products by name, category, stock level, price range, or get aggregate summaries
 - **`query_sales`** — Filter sales by date, category, product; group by day/week/month/product/category; drill into a specific sale
 - **`query_orders`** — Filter restock orders by status, product, or date range
 - **`compare_sales_periods`** — Compare revenue and sales count between two time periods
+- **`get_daily_briefing`** — One-call daily snapshot: sales, top products, day-over-day comparison, pending orders, low stock, inventory
 - **`restock_order` / `bulk_restock` / `fulfill_order`** — Mutations with user approval (single+batch restock, fulfillment)
 
 ### Dashboard
@@ -109,7 +110,7 @@ src/
 - **chats** — `id`, `title`, `created_at`, `updated_at`
 - **chat_messages** — `id`, `chat_id`, `message_id` (unique per chat), `role`, `content`, `created_at`
 
-### AI Tools (7 total)
+### AI Tools (8 total)
 
 | Tool | Type | Purpose |
 |---|---|---|
@@ -117,6 +118,7 @@ src/
 | `query_sales` | Read | Filter sales by date, category, product; group by product/category/day/week/month; `saleId` for detail |
 | `query_orders` | Read | Filter restock orders by status, product, or date range |
 | `compare_sales_periods` | Read | Compare revenue and sales count between two time periods |
+| `get_daily_briefing` | Read | Consolidated daily snapshot: sales, top products, day-over-day comparison, pending orders, created orders, low stock, inventory |
 | `restock_order` | Mutate | Create a single restock order (requires user approval) |
 | `bulk_restock` | Mutate | Create multiple restock orders at once (requires user approval) |
 | `fulfill_order` | Mutate | Fulfill a pending order — adds quantity to product stock (requires user approval) |
@@ -200,3 +202,4 @@ AI_MODEL=qwen3.5:4b
 - *"Recent restock orders"*
 - *"Fulfill order #3"*
 - *"Restock 10 units of every product in Electronics"*
+- *"Yesterday's update"*

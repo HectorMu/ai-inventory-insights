@@ -710,3 +710,65 @@ export function getChatMessages(chatId: number) {
     .orderBy(asc(schema.chatMessages.createdAt))
     .all();
 }
+
+export function getDailyBriefing(date: string) {
+  const prevDate = new Date(new Date(date).getTime() - 86400000).toISOString().split("T")[0];
+
+  const salesByProduct = getSalesSummary(date, date, "product");
+  const totalRevenue = salesByProduct.reduce((sum, s) => sum + s.revenue, 0);
+
+  const rawSales = db
+    .select({ count: count().mapWith(Number) })
+    .from(schema.sales)
+    .where(and(gte(schema.sales.createdAt, date), lte(schema.sales.createdAt, date)))
+    .get();
+  const transactionCount = rawSales?.count ?? 0;
+
+  const prevRevenue = getSalesSummary(prevDate, prevDate, "product").reduce(
+    (sum, s) => sum + s.revenue,
+    0,
+  );
+  const revenueChangePercent =
+    prevRevenue === 0
+      ? null
+      : Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 10000) / 100;
+
+  const pendingOrders = queryOrders({ status: "pending" });
+  const createdOrders = queryOrders({ from: date, to: date });
+  const lowStock = getLowStockProducts(20);
+  const inventory = getInventorySummary();
+
+  return {
+    date,
+    sales: {
+      totalRevenue,
+      transactionCount,
+      topProducts: salesByProduct
+        .slice(0, 5)
+        .map((s) => ({ name: s.label, revenue: s.revenue, quantity: s.quantity })),
+    },
+    vsYesterday: {
+      revenueChangePercent,
+      previousRevenue: prevRevenue,
+    },
+    orders: {
+      pending: pendingOrders.map((o) => ({
+        id: o.id,
+        productName: o.productName,
+        quantity: o.quantity,
+      })),
+      createdToday: createdOrders.map((o) => ({
+        id: o.id,
+        productName: o.productName,
+        quantity: o.quantity,
+        status: o.status,
+      })),
+    },
+    lowStock: lowStock.map((p) => ({ id: p.id, name: p.name, stock: p.stock, category: p.category })),
+    inventory: {
+      totalProducts: inventory.totalProducts,
+      totalStock: inventory.totalStock,
+      totalInventoryValue: inventory.totalInventoryValue,
+    },
+  };
+}
