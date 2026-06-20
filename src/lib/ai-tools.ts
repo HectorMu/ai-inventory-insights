@@ -1,62 +1,93 @@
 import { dynamicTool } from "ai";
 import { z } from "zod";
 import {
-  getSalesSummary,
-  getTopProducts,
-  getLowStockProducts,
+  queryProducts,
+  querySales,
+  queryOrders,
   getSalesComparison,
-  getCategoryBreakdown,
-  getSaleById,
-  searchProducts,
-  getAllCategories,
-  getInventorySummary,
-  getAllProducts,
   createOrder,
-  getAllOrders,
   fulfillOrder,
 } from "@/db/queries";
 
-export const salesSummaryTool = dynamicTool({
-  description: "Get sales summary grouped by product, category, day, week, or month for a date range",
-  inputSchema: z.object({
-    from: z.string().describe("Start date (YYYY-MM-DD)"),
-    to: z.string().describe("End date (YYYY-MM-DD)"),
-    groupBy: z
-      .enum(["product", "category", "day", "week", "month"])
-      .describe("Group results by this dimension"),
-  }),
-  execute: async (input) => {
-    const { from, to, groupBy } = input as { from: string; to: string; groupBy: "product" | "category" | "day" | "week" | "month" };
-    return getSalesSummary(from, to, groupBy);
+const queryProductsSchema = z.object({
+  search: z.string().optional().describe("Text search across product name and category"),
+  category: z.string().optional().describe("Filter by exact category name"),
+  stockLte: z.number().optional().describe("Max stock threshold (e.g. 10 for low-stock)"),
+  stockGte: z.number().optional().describe("Min stock threshold"),
+  priceLte: z.number().optional().describe("Max price filter"),
+  priceGte: z.number().optional().describe("Min price filter"),
+  sortBy: z.enum(["name", "stock", "price", "category"]).optional().describe("Sort field"),
+  order: z.enum(["asc", "desc"]).optional().describe("Sort direction"),
+  limit: z.number().optional().describe("Max results (default 50)"),
+  summary: z.boolean().optional().describe("If true, return aggregate stats + categories instead of product list"),
+});
+
+const querySalesSchema = z.object({
+  from: z.string().optional().describe("Start date (YYYY-MM-DD)"),
+  to: z.string().optional().describe("End date (YYYY-MM-DD)"),
+  groupBy: z.enum(["product", "category", "day", "week", "month"]).optional().describe("Group results by this dimension"),
+  category: z.string().optional().describe("Filter by product category"),
+  productId: z.number().optional().describe("Filter by product ID"),
+  saleId: z.number().optional().describe("Get full detail of a specific sale (includes line items)"),
+  limit: z.number().optional().describe("Max results (default 50)"),
+  sortBy: z.enum(["revenue", "date", "quantity"]).optional().describe("Sort field"),
+  order: z.enum(["asc", "desc"]).optional().describe("Sort direction"),
+});
+
+const queryOrdersSchema = z.object({
+  status: z.enum(["pending", "ordered", "received", "fulfilled", "cancelled"]).optional().describe("Filter by order status"),
+  productId: z.number().optional().describe("Filter by product ID"),
+  from: z.string().optional().describe("Start date (YYYY-MM-DD)"),
+  to: z.string().optional().describe("End date (YYYY-MM-DD)"),
+  sortBy: z.enum(["date", "status", "product"]).optional().describe("Sort field"),
+  order: z.enum(["asc", "desc"]).optional().describe("Sort direction"),
+  limit: z.number().optional().describe("Max results (default 50)"),
+});
+
+export const queryProductsTool = dynamicTool({
+  description: `Search and filter products. Use filters to narrow results instead of dumping all records.
+  - Set summary=true to get aggregate data (count, avg price, total value, categories list)
+  - Use search to find products by name or category
+  - Use stockLte for low-stock queries
+  - Use category to filter by exact category`,
+  inputSchema: queryProductsSchema,
+  execute: async (input: unknown) => {
+    const filters = input as z.infer<typeof queryProductsSchema>;
+    const result = queryProducts(filters);
+    return JSON.parse(JSON.stringify(result));
   },
 });
 
-export const topProductsTool = dynamicTool({
-  description: "Get top selling products by revenue in a date range",
-  inputSchema: z.object({
-    from: z.string().describe("Start date (YYYY-MM-DD)"),
-    to: z.string().describe("End date (YYYY-MM-DD)"),
-    limit: z.number().describe("Number of top products to return"),
-  }),
-  execute: async (input) => {
-    const { from, to, limit } = input as { from: string; to: string; limit: number };
-    return getTopProducts(from, to, limit);
+export const querySalesTool = dynamicTool({
+  description: `Query sales data with filters, grouping, and optional sale detail.
+  - Set saleId to get full detail of a specific sale (with line items)
+  - Set groupBy to get aggregated sales by product, category, day, week, or month
+  - Use from/to to scope date range
+  - Use category or productId to filter
+  - Without groupBy or saleId, returns a raw chronological sales list`,
+  inputSchema: querySalesSchema,
+  execute: async (input: unknown) => {
+    const filters = input as z.infer<typeof querySalesSchema>;
+    const result = querySales(filters);
+    return JSON.parse(JSON.stringify(result));
   },
 });
 
-export const lowStockTool = dynamicTool({
-  description: "Get products with stock below a threshold, use 20 as default if not specified",
-  inputSchema: z.object({
-    threshold: z.number().default(20).describe("Stock threshold"),
-  }),
-  execute: async (input) => {
-    const { threshold } = input as { threshold: number };
-    return getLowStockProducts(threshold);
+export const queryOrdersTool = dynamicTool({
+  description: `Query restock orders with optional filters.
+  - Use status to filter by order status (pending, ordered, received, fulfilled, cancelled)
+  - Use productId to get orders for a specific product
+  - Use from/to for date range`,
+  inputSchema: queryOrdersSchema,
+  execute: async (input: unknown) => {
+    const filters = input as z.infer<typeof queryOrdersSchema>;
+    const result = queryOrders(filters);
+    return JSON.parse(JSON.stringify(result));
   },
 });
 
-export const salesComparisonTool = dynamicTool({
-  description: "Compare sales between two time periods",
+export const compareSalesPeriodsTool = dynamicTool({
+  description: "Compare total revenue and sales count between two time periods. Returns each period's stats plus percent change.",
   inputSchema: z.object({
     periodA: z.object({
       from: z.string().describe("Start date for period A (YYYY-MM-DD)"),
@@ -70,66 +101,6 @@ export const salesComparisonTool = dynamicTool({
   execute: async (input) => {
     const { periodA, periodB } = input as { periodA: { from: string; to: string }; periodB: { from: string; to: string } };
     return getSalesComparison(periodA, periodB);
-  },
-});
-
-export const categoryBreakdownTool = dynamicTool({
-  description: "Get sales breakdown by category for a date range",
-  inputSchema: z.object({
-    from: z.string().describe("Start date (YYYY-MM-DD)"),
-    to: z.string().describe("End date (YYYY-MM-DD)"),
-  }),
-  execute: async (input) => {
-    const { from, to } = input as { from: string; to: string };
-    return getCategoryBreakdown(from, to);
-  },
-});
-
-export const saleDetailTool = dynamicTool({
-  description: "Get detailed information about a specific sale including all items purchased",
-  inputSchema: z.object({
-    saleId: z.number().describe("Sale ID to look up"),
-  }),
-  execute: async (input) => {
-    const { saleId } = input as { saleId: number };
-    const sale = getSaleById(saleId);
-    if (!sale) return JSON.stringify({ error: "Sale not found" });
-    return JSON.parse(JSON.stringify(sale));
-  },
-});
-
-export const searchProductsTool = dynamicTool({
-  description: "Search products by name or category",
-  inputSchema: z.object({
-    query: z.string().describe("Search query to match product name or category"),
-  }),
-  execute: async (input) => {
-    const { query } = input as { query: string };
-    return searchProducts(query);
-  },
-});
-
-export const categoriesTool = dynamicTool({
-  description: "Get all available product categories",
-  inputSchema: z.object({}),
-  execute: async () => {
-    return getAllCategories();
-  },
-});
-
-export const inventorySummaryTool = dynamicTool({
-  description: "Get inventory summary: total products, stock count, average price, total inventory value",
-  inputSchema: z.object({}),
-  execute: async () => {
-    return getInventorySummary();
-  },
-});
-
-export const allProductsTool = dynamicTool({
-  description: "Get a list of all products with their stock levels, prices, and categories",
-  inputSchema: z.object({}),
-  execute: async () => {
-    return getAllProducts();
   },
 });
 
@@ -149,11 +120,21 @@ export const restockOrderTool = dynamicTool({
   },
 });
 
-export const recentOrdersTool = dynamicTool({
-  description: "Get recent restock orders and their statuses",
-  inputSchema: z.object({}),
-  execute: async () => {
-    return getAllOrders();
+export const bulkRestockTool = dynamicTool({
+  description: "Create restock orders for multiple products at once. Requires user approval before execution.",
+  title: "Bulk Restock",
+  inputSchema: z.object({
+    items: z.array(z.object({
+      productId: z.number().describe("Product ID to restock"),
+      quantity: z.number().positive().describe("Quantity to order"),
+      productName: z.string().optional().describe("Product name for display in the approval dialog"),
+    })).min(1).describe("List of products and quantities to restock"),
+  }),
+  needsApproval: true,
+  execute: async (input) => {
+    const { items } = input as { items: { productId: number; quantity: number }[] };
+    const results = items.map((item) => createOrder(item.productId, item.quantity));
+    return JSON.parse(JSON.stringify(results));
   },
 });
 
@@ -171,24 +152,6 @@ export const fulfillOrderTool = dynamicTool({
     const result = fulfillOrder(orderId);
     if (!result) return JSON.stringify({ error: "Order not found" });
     return JSON.parse(JSON.stringify(result));
-  },
-});
-
-export const bulkRestockTool = dynamicTool({
-  description: "Create restock orders for multiple products at once. Requires user approval before execution.",
-  title: "Bulk Restock",
-  inputSchema: z.object({
-    items: z.array(z.object({
-      productId: z.number().describe("Product ID to restock"),
-      quantity: z.number().positive().describe("Quantity to order"),
-      productName: z.string().optional().describe("Product name for display in the approval dialog"),
-    })).min(1).describe("List of products and quantities to restock"),
-  }),
-  needsApproval: true,
-  execute: async (input) => {
-    const { items } = input as { items: { productId: number; quantity: number }[] };
-    const results = items.map((item) => createOrder(item.productId, item.quantity));
-    return JSON.parse(JSON.stringify(results));
   },
 });
 

@@ -201,6 +201,76 @@ export function getAllProducts() {
   return rows;
 }
 
+export function queryProducts(filters: {
+  search?: string;
+  category?: string;
+  stockLte?: number;
+  stockGte?: number;
+  priceLte?: number;
+  priceGte?: number;
+  sortBy?: string;
+  order?: string;
+  limit?: number;
+  summary?: boolean;
+}) {
+  if (filters.summary) {
+    const totalProducts = db.select({ count: count().mapWith(Number) }).from(schema.products).get();
+    const totalStock = db.select({ value: sql`SUM(${schema.products.stock})`.mapWith(Number) }).from(schema.products).get();
+    const avgPrice = db.select({ value: sql`AVG(${schema.products.price})`.mapWith(Number) }).from(schema.products).get();
+    const totalValue = db.select({ value: sql`SUM(${schema.products.price} * ${schema.products.stock})`.mapWith(Number) }).from(schema.products).get();
+    const categories = db
+      .select({ category: schema.products.category })
+      .from(schema.products)
+      .groupBy(schema.products.category)
+      .orderBy(asc(schema.products.category))
+      .all()
+      .map((r) => r.category);
+
+    return {
+      totalProducts: totalProducts?.count ?? 0,
+      totalStock: totalStock?.value ?? 0,
+      avgPrice: avgPrice?.value ?? 0,
+      totalInventoryValue: totalValue?.value ?? 0,
+      categories,
+    };
+  }
+
+  const conditions: ReturnType<typeof and>[] = [];
+  if (filters.search) {
+    conditions.push(
+      or(
+        like(schema.products.name, `%${filters.search}%`),
+        like(schema.products.category, `%${filters.search}%`)
+      )
+    );
+  }
+  if (filters.category) conditions.push(eq(schema.products.category, filters.category));
+  if (filters.stockLte !== undefined) conditions.push(lte(schema.products.stock, filters.stockLte));
+  if (filters.stockGte !== undefined) conditions.push(gte(schema.products.stock, filters.stockGte));
+  if (filters.priceLte !== undefined) conditions.push(lte(schema.products.price, filters.priceLte));
+  if (filters.priceGte !== undefined) conditions.push(gte(schema.products.price, filters.priceGte));
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const sortColumn = (() => {
+    switch (filters.sortBy) {
+      case "stock": return schema.products.stock;
+      case "price": return schema.products.price;
+      case "category": return schema.products.category;
+      default: return schema.products.name;
+    }
+  })();
+  const sortOrder = filters.order === "desc" ? desc(sortColumn) : asc(sortColumn);
+
+  return db
+    .select()
+    .from(schema.products)
+    .where(whereClause)
+    .orderBy(sortOrder)
+    .limit(Math.min(filters.limit ?? 50, 200))
+    .all();
+}
+
 export function getAllSales(from?: string, to?: string, category?: string) {
   const conditions = [];
   if (from) conditions.push(gte(schema.sales.createdAt, from));
@@ -318,6 +388,142 @@ export function createOrder(productId: number, quantity: number) {
     .where(eq(schema.products.id, productId))
     .get();
   return { ...result, productName: product?.name ?? "Unknown" };
+}
+
+export function querySales(filters: {
+  from?: string;
+  to?: string;
+  groupBy?: string;
+  category?: string;
+  productId?: number;
+  saleId?: number;
+  limit?: number;
+  sortBy?: string;
+  order?: string;
+}) {
+  if (filters.saleId !== undefined) {
+    return getSaleById(filters.saleId);
+  }
+
+  const dateConditions: ReturnType<typeof and>[] = [];
+  if (filters.from) dateConditions.push(gte(schema.sales.createdAt, filters.from));
+  if (filters.to) dateConditions.push(lte(schema.sales.createdAt, filters.to));
+  const dateFilter = dateConditions.length > 0 ? and(...dateConditions) : undefined;
+
+  const joinConditions: ReturnType<typeof and>[] = [];
+  if (filters.category) joinConditions.push(eq(schema.products.category, filters.category));
+  if (filters.productId) joinConditions.push(eq(schema.products.id, filters.productId));
+  const joinFilter = joinConditions.length > 0 ? and(...joinConditions) : undefined;
+
+  const finalWhere = dateFilter && joinFilter
+    ? and(dateFilter, joinFilter)
+    : (dateFilter ?? joinFilter ?? undefined);
+
+  const cap = Math.min(filters.limit ?? 50, 200);
+
+  if (filters.groupBy) {
+    let groupColumn;
+    switch (filters.groupBy) {
+      case "product": groupColumn = schema.products.name; break;
+      case "category": groupColumn = schema.products.category; break;
+      case "day": groupColumn = schema.sales.createdAt; break;
+      case "week": groupColumn = sql`strftime('%Y-W%W', ${schema.sales.createdAt})`; break;
+      case "month": groupColumn = sql`strftime('%Y-%m', ${schema.sales.createdAt})`; break;
+      default: throw new Error(`Invalid groupBy: ${filters.groupBy}`);
+    }
+
+    const sortCol = filters.sortBy === "quantity"
+      ? sum(schema.saleItems.quantity)
+      : sum(schema.saleItems.unitPrice);
+    const sortOrd = filters.order === "asc" ? asc(sortCol) : desc(sortCol);
+
+    return db
+      .select({
+        label: groupColumn,
+        revenue: sum(schema.saleItems.unitPrice).mapWith(Number),
+        quantity: sum(schema.saleItems.quantity).mapWith(Number),
+      })
+      .from(schema.sales)
+      .innerJoin(schema.saleItems, eq(schema.sales.id, schema.saleItems.saleId))
+      .innerJoin(schema.products, eq(schema.saleItems.productId, schema.products.id))
+      .where(finalWhere)
+      .groupBy(groupColumn)
+      .orderBy(sortOrd)
+      .limit(cap)
+      .all();
+  }
+
+  const baseConditions: ReturnType<typeof and>[] = [];
+  if (dateFilter) baseConditions.push(dateFilter);
+  if (filters.category) {
+    baseConditions.push(
+      sql`EXISTS (SELECT 1 FROM sale_items si JOIN products p ON si.product_id = p.id WHERE si.sale_id = sales.id AND p.category = ${filters.category})`
+    );
+  }
+  if (filters.productId) {
+    baseConditions.push(
+      sql`EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = sales.id AND si.product_id = ${filters.productId})`
+    );
+  }
+  const rawWhere = baseConditions.length > 0 ? and(...baseConditions) : undefined;
+
+  const sortCol = filters.sortBy === "revenue" ? schema.sales.total : schema.sales.createdAt;
+  const sortOrd = filters.order === "asc" ? asc(sortCol) : desc(sortCol);
+
+  return db
+    .select({
+      id: schema.sales.id,
+      createdAt: schema.sales.createdAt,
+      total: schema.sales.total,
+    })
+    .from(schema.sales)
+    .where(rawWhere)
+    .orderBy(sortOrd)
+    .limit(cap)
+    .all();
+}
+
+export function queryOrders(filters: {
+  status?: string;
+  productId?: number;
+  from?: string;
+  to?: string;
+  sortBy?: string;
+  order?: string;
+  limit?: number;
+}) {
+  const conditions: ReturnType<typeof and>[] = [];
+  if (filters.status) conditions.push(eq(schema.orders.status, filters.status));
+  if (filters.productId) conditions.push(eq(schema.orders.productId, filters.productId));
+  if (filters.from) conditions.push(gte(schema.orders.createdAt, filters.from));
+  if (filters.to) conditions.push(lte(schema.orders.createdAt, filters.to));
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const sortColumn = (() => {
+    switch (filters.sortBy) {
+      case "status": return schema.orders.status;
+      case "product": return schema.products.name;
+      default: return schema.orders.createdAt;
+    }
+  })();
+  const sortOrder = filters.order === "asc" ? asc(sortColumn) : desc(sortColumn);
+
+  return db
+    .select({
+      id: schema.orders.id,
+      productId: schema.orders.productId,
+      productName: schema.products.name,
+      quantity: schema.orders.quantity,
+      status: schema.orders.status,
+      createdAt: schema.orders.createdAt,
+    })
+    .from(schema.orders)
+    .innerJoin(schema.products, eq(schema.orders.productId, schema.products.id))
+    .where(whereClause)
+    .orderBy(sortOrder)
+    .limit(Math.min(filters.limit ?? 50, 200))
+    .all();
 }
 
 export function getAllOrders() {

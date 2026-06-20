@@ -2,20 +2,13 @@ import { ToolLoopAgent, createAgentUIStreamResponse } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { upsertChatMessage } from "@/db/queries";
 import {
-  salesSummaryTool,
-  topProductsTool,
-  lowStockTool,
-  salesComparisonTool,
-  categoryBreakdownTool,
-  saleDetailTool,
-  searchProductsTool,
-  categoriesTool,
-  inventorySummaryTool,
-  allProductsTool,
+  queryProductsTool,
+  querySalesTool,
+  queryOrdersTool,
+  compareSalesPeriodsTool,
   restockOrderTool,
-  recentOrdersTool,
-  fulfillOrderTool,
   bulkRestockTool,
+  fulfillOrderTool,
 } from "@/lib/ai-tools";
 
 const provider = createOpenAI({
@@ -26,45 +19,63 @@ const provider = createOpenAI({
 const agent = new ToolLoopAgent({
   model: provider.chat(process.env.AI_MODEL ?? "llama-3.3-70b-versatile"),
   tools: {
-    get_sales_summary: salesSummaryTool,
-    get_top_products: topProductsTool,
-    get_low_stock_products: lowStockTool,
-    get_sales_comparison: salesComparisonTool,
-    get_category_breakdown: categoryBreakdownTool,
-    get_sale_detail: saleDetailTool,
-    search_products: searchProductsTool,
-    get_categories: categoriesTool,
-    get_inventory_summary: inventorySummaryTool,
-    get_all_products: allProductsTool,
+    query_products: queryProductsTool,
+    query_sales: querySalesTool,
+    query_orders: queryOrdersTool,
+    compare_sales_periods: compareSalesPeriodsTool,
     restock_order: restockOrderTool,
-    get_recent_orders: recentOrdersTool,
-    fulfill_order: fulfillOrderTool,
     bulk_restock: bulkRestockTool,
+    fulfill_order: fulfillOrderTool,
   },
   allowSystemInMessages: true,
    instructions: `You are an AI inventory and sales analytics assistant with access to a live database of products and sales.
 
 You MUST use the provided tools to answer questions. NEVER describe what you would do — actually call the tools and use the results.
 
-Rules:
+AVAILABLE TOOLS:
+
+--- Query Tools (read-only) ---
+
+1. query_products: Search and filter products.
+   Key params: search, category, stockLte (low stock), stockGte, priceLte, priceGte, sortBy, limit.
+   Set summary=true to get aggregate stats (total products, stock, avg price, categories list).
+   Examples: { category: "Electronics" } | { stockLte: 10 } | { search: "monitor" } | { summary: true }
+
+2. query_sales: Query sales with filters, grouping, and optional sale detail.
+   Set saleId to get full detail of a specific sale (with line items).
+   Set groupBy (product/category/day/week/month) for aggregated breakdowns.
+   Use from/to for date range, category or productId to filter.
+   Examples: { groupBy: "month" } | { saleId: 42 } | { groupBy: "product", limit: 5, sortBy: "revenue" } | { category: "Electronics", groupBy: "month" }
+
+3. query_orders: Query restock orders with optional filters.
+   Use status to filter: pending, ordered, received, fulfilled, cancelled.
+   Use productId or date range to narrow results.
+   Examples: { status: "pending" } | { status: "fulfilled", limit: 5 } | { productId: 3 }
+
+4. compare_sales_periods: Compare total revenue and sales count between two time periods.
+   Use this for month-over-month, quarter-over-quarter, or any period comparison.
+   Example: { periodA: { from: "2026-05-01", to: "2026-05-31" }, periodB: { from: "2026-04-01", to: "2026-04-30" } }
+
+--- Mutation Tools (require user approval) ---
+
+5. restock_order: Create a single restock order (needs approval).
+6. bulk_restock: Create multiple restock orders at once (needs approval).
+7. fulfill_order: Fulfill a pending order — adds quantity to product stock (needs approval).
+
+RULES:
 - Always call a tool when the user asks about data. NEVER just say "I would call X tool".
 - Current year is 2026. Our data covers January to June 2026.
-- Always prefer real data over assumptions.
-- Be concise, insightful, and data-driven in your responses.
-- When the data has labels and values, you can present it as markdown.
+- Always prefer real data over assumptions. Be concise, insightful, and data-driven.
+- Use filter parameters to narrow results — avoid dumping all records unnecessarily.
+- When the data has labels and values, present it as markdown tables.
 
-MUTATION TOOLS (these require user approval before executing):
-- restock_order: Create a restock order for a single product. The system will pause and prompt the user to approve.
-- bulk_restock: Create restock orders for multiple products at once. The system will prompt the user to approve.
-- fulfill_order: Fulfill a pending order (adds quantity to product stock). The system will prompt the user to approve.
-
-IMPORTANT: When calling restock_order, bulk_restock, or fulfill_order, ALWAYS include the productName and quantity fields in the input so the approval dialog shows readable information. You already know the product name from your search results — pass it along.
-
-When you call a mutation tool, the system automatically pauses and asks the user for confirmation. You do NOT need to stop and ask manually — call the tool directly and the system handles the approval. If the user approves, the tool executes. If they deny, it won't. Proceed naturally from there.
+APPROVAL FLOW (mutation tools):
+When calling restock_order, bulk_restock, or fulfill_order, ALWAYS include the productName and quantity fields in the input so the approval dialog shows readable information. You already know the product name from your search results — pass it along.
+The system automatically pauses and asks the user for confirmation. You do NOT need to stop and ask manually — call the tool directly and the system handles the approval.
 
 CREATION → FULFILLMENT FLOW:
 After restock_order or bulk_restock executes successfully, ALWAYS ask the user: "The order was created. Would you like to fulfill it now? You can also ask me to fulfill it at any later time."
-If they say yes, call fulfill_order with the order ID. Fulfillment adds the quantity to product stock and also requires approval — the system handles it automatically.
+If they say yes, call fulfill_order with the order ID.
 `,
 });
 
