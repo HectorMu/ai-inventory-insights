@@ -22,13 +22,77 @@ An **AI-powered inventory and sales analytics platform** built with Next.js 16. 
 ## Features
 
 ### AI Sales Analyst Agent
-Natural-language chat interface with a resizable side panel. The agent queries your live data using **8 filterable tools**:
+
+Talk to your data like you would a human analyst. The AI agent understands natural-language requests, queries your live database, and takes action — all through a resizable chat panel.
+
+**What you can say:**
+
+| You ask | The agent does |
+|---------|---------------|
+| *"What were my top products this quarter?"* | Queries revenue data, groups by product, returns a ranked table |
+| *"Which products are low in stock?"* | Filters products by stock level, highlights what needs restocking |
+| *"Yesterday's update"* | Single-call daily briefing: sales, orders, low stock, inventory, day-over-day comparison |
+| *"Compare this month vs last month"* | Compares two periods side-by-side with revenue, count, and % change |
+| *"Restock all low-stock electronics"* | Identifies low items, creates bulk orders — pauses for your approval |
+| *"Fulfill order #3"* | Adds quantity to product stock, updates order status — pauses for your approval |
+
+The agent has **8 filterable tools** — each accepts targeted parameters so it fetches exactly what's needed, not everything:
+
 - **`query_products`** — Search/filter products by name, category, stock level, price range, or get aggregate summaries
 - **`query_sales`** — Filter sales by date, category, product; group by day/week/month/product/category; drill into a specific sale
 - **`query_orders`** — Filter restock orders by status, product, or date range
 - **`compare_sales_periods`** — Compare revenue and sales count between two time periods
 - **`get_daily_briefing`** — One-call daily snapshot: sales, top products, day-over-day comparison, pending orders, low stock, inventory
 - **`restock_order` / `bulk_restock` / `fulfill_order`** — Mutations with user approval (single+batch restock, fulfillment)
+
+#### Conversation Showcase
+
+> **You:** *"What happened yesterday?"*
+>
+> **Agent:**
+> ```text
+> **📊 Yesterday's Briefing (2026-06-18)**
+>
+> **Sales** — $4,230.00 from 12 transactions
+> Top products: Wireless Mouse ($980), USB-C Hub ($720), HDMI Cable ($410)
+>
+> **vs Previous Day** — +15.3% ($3,670.00 → $4,230.00)
+>
+> **Orders** — 2 pending (Monitor x5, Keyboard x10)
+> 1 order created yesterday
+>
+> **Alerts** — 3 products below 10 stock
+> ```
+>
+> **You:** *"Restock those 3 low-stock items with 20 units each."*
+>
+> **Agent:** *"I'll create orders for..."* (presents proposal)
+> *Order #42: Monitor — qty 20*
+> *Order #43: Keyboard — qty 20*
+> *Order #44: Mouse Pad — qty 20*
+>
+> *System pauses for your approval...* ✅
+>
+> **You:** *"Looks good."*
+>
+> **Agent:** *"Orders created! Would you like to fulfill them now?"*
+
+#### Mutation Flow with Approval
+
+Restock and fulfill operations require user confirmation. The agent proposes, you approve — no accidental stock changes:
+
+```mermaid
+sequenceDiagram
+    User->>Agent: Restock low-stock items
+    Agent->>Database: query_products(stockLte: 10)
+    Database-->>Agent: [Monitor(3), Keyboard(5)]
+    Agent->>User: Proposes: Monitor x20, Keyboard x20
+    Note over Agent,User: System pauses — waits for approval
+    User->>Agent: Looks good
+    Agent->>Database: bulk_restock(items: [...])
+    Database-->>Agent: Orders created
+    Agent->>User: Done! Would you like to fulfill now?
+```
 
 ### Dashboard
 KPI cards showing total revenue, total sales, top product, and low stock count. Quick-action chat panel always available.
@@ -192,14 +256,31 @@ AI_MODEL=qwen3.5:4b
 
 ## Example Chat Queries
 
+### Daily Check-Ins
+- *"Yesterday's update"* / *"Morning briefing"*
+- *"What happened on June 15?"*
+- *"How are we doing today?"*
+
+### Sales Analysis
 - *"What were my top products this quarter?"*
 - *"Show me sales by category"*
-- *"Which products are low in stock?"*
 - *"Compare sales this month vs last month"*
+- *"Which month had the highest revenue?"*
+- *"Show me the breakdown of electronics sales by week"*
+- *"What's in sale #42?"*
+
+### Inventory Management
+- *"Which products are low in stock?"*
 - *"Show me the full inventory summary"*
-- *"I want to restock all low stock items"*
-- *"Search for electronics products"*
+- *"Search for monitor products"*
+- *"What electronics do we have under $50?"*
+- *"How many total units are in stock?"*
+
+### Operations & Orders
+- *"Any pending orders?"*
 - *"Recent restock orders"*
+- *"Show me orders for product #5"*
 - *"Fulfill order #3"*
+- *"Restock 10 units of Wireless Mouse"*
+- *"Restock all low-stock items"*
 - *"Restock 10 units of every product in Electronics"*
-- *"Yesterday's update"*
