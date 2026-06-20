@@ -1,7 +1,7 @@
 const MUTATION_TOOL_CACHE_MAP: Record<string, string[][]> = {
-  confirm_restock_order: [["orders"]],
-  confirm_bulk_restock: [["orders"]],
-  confirm_fulfill_order: [["orders"], ["products"], ["dashboard"]],
+  restock_order: [["orders"]],
+  bulk_restock: [["orders"]],
+  fulfill_order: [["orders"], ["products"], ["dashboard"]],
 };
 
 export function getInvalidationKeysFromMessage(message: {

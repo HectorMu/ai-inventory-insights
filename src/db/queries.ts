@@ -312,7 +312,12 @@ export function createOrder(productId: number, quantity: number) {
     .values({ productId, quantity, status: "pending", createdAt: now })
     .returning()
     .get();
-  return result;
+  const product = db
+    .select({ name: schema.products.name })
+    .from(schema.products)
+    .where(eq(schema.products.id, productId))
+    .get();
+  return { ...result, productName: product?.name ?? "Unknown" };
 }
 
 export function getAllOrders() {

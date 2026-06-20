@@ -5,6 +5,7 @@ import { useChat } from "@ai-sdk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChats } from "@/hooks/use-chats";
 import { getInvalidationKeysFromMessage } from "@/lib/cache-invalidation";
+import { lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -34,14 +35,36 @@ export function ChatPanel() {
   const chatTitle = currentChat?.title ?? "AI Analyst";
 
   const queryClient = useQueryClient();
-  const { messages, setMessages, sendMessage, status, error: chatError } = useChat({
+  const { messages, setMessages, sendMessage, status, error: chatError, addToolApprovalResponse } = useChat({
     onFinish: ({ message }) => {
       const keysToInvalidate = getInvalidationKeysFromMessage(message);
       for (const key of keysToInvalidate) {
         queryClient.invalidateQueries({ queryKey: key });
       }
     },
+    sendAutomaticallyWhen: ({ messages }) =>
+      lastAssistantMessageIsCompleteWithApprovalResponses({ messages }),
   });
+
+  const handleApprove = useCallback(
+    (approvalId: string) =>
+      addToolApprovalResponse({
+        id: approvalId,
+        approved: true,
+        options: { body: { chatId: activeChatRef.current } },
+      }),
+    [addToolApprovalResponse]
+  );
+
+  const handleDeny = useCallback(
+    (approvalId: string) =>
+      addToolApprovalResponse({
+        id: approvalId,
+        approved: false,
+        options: { body: { chatId: activeChatRef.current } },
+      }),
+    [addToolApprovalResponse]
+  );
 
   useEffect(() => {
     titleSetRef.current = false;
@@ -74,6 +97,12 @@ export function ChatPanel() {
         }));
         setMessages(uiMsgs as Parameters<typeof setMessages>[0]);
         setIsLoading(false);
+        requestAnimationFrame(() => {
+          scrollViewportRef.current?.scrollTo({
+            top: scrollViewportRef.current.scrollHeight,
+            behavior: "auto",
+          });
+        });
       })
       .catch((err: Error) => {
         if (cancelled) return;
@@ -94,6 +123,24 @@ export function ChatPanel() {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     });
   }, [messages, scrollViewportRef]);
+
+  useEffect(() => {
+    const hasPending = messages.some(
+      (m) =>
+        m.role === "assistant" &&
+        m.parts?.some(
+          (p) =>
+            p.type === "dynamic-tool" &&
+            (p as { state: string }).state === "approval-requested"
+        )
+    );
+    if (!hasPending) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [messages]);
 
   useEffect(() => {
     if (isEditingTitle && editInputRef.current) {
@@ -342,7 +389,7 @@ export function ChatPanel() {
         ) : (
           <div className="space-y-4">
             {messages.map((message) => (
-              <ChatMessageUI key={message.id} message={message} />
+              <ChatMessageUI key={message.id} message={message} onApprove={handleApprove} onDeny={handleDeny} />
             ))}
             {(status === "streaming" || status === "submitted") && (
               <div className="text-sm text-muted-foreground animate-pulse">

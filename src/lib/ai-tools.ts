@@ -133,33 +133,15 @@ export const allProductsTool = dynamicTool({
   },
 });
 
-export const proposeRestockOrderTool = dynamicTool({
-  description: "Propose a restock order for a product. Does NOT save. The agent MUST stop after calling this and ask the user to confirm before calling confirm_restock_order.",
+export const restockOrderTool = dynamicTool({
+  description: "Create a restock order for a single product. Requires user approval before execution.",
+  title: "Restock Order",
   inputSchema: z.object({
     productId: z.number().describe("Product ID to restock"),
     quantity: z.number().positive().describe("Quantity to order"),
+    productName: z.string().optional().describe("Product name for display in the approval dialog"),
   }),
-  execute: async (input) => {
-    const { productId, quantity } = input as { productId: number; quantity: number };
-    const products = getAllProducts();
-    const product = products.find((p) => p.id === productId);
-    if (!product) return JSON.stringify({ error: "Product not found" });
-    return JSON.stringify({
-      proposed: true,
-      product: { id: product.id, name: product.name, category: product.category, currentStock: product.stock },
-      quantity,
-      estimatedTotal: (product.price * quantity).toFixed(2),
-      message: `Order ${quantity} units of "${product.name}" (currently ${product.stock} in stock). Say "confirm" to create, or "cancel" to discard.`,
-    });
-  },
-});
-
-export const confirmRestockOrderTool = dynamicTool({
-  description: "Confirm and create a restock order after the user has approved the proposed order",
-  inputSchema: z.object({
-    productId: z.number().describe("Product ID to restock"),
-    quantity: z.number().positive().describe("Quantity to order"),
-  }),
+  needsApproval: true,
   execute: async (input) => {
     const { productId, quantity } = input as { productId: number; quantity: number };
     const order = createOrder(productId, quantity);
@@ -175,31 +157,15 @@ export const recentOrdersTool = dynamicTool({
   },
 });
 
-export const proposeFulfillOrderTool = dynamicTool({
-  description: "Propose to fulfill a pending or ordered restock order. Does NOT save. The agent MUST stop after calling this and ask the user to confirm before calling confirm_fulfill_order.",
+export const fulfillOrderTool = dynamicTool({
+  description: "Fulfill a pending restock order. Adds the ordered quantity to product stock. Requires user approval before execution.",
+  title: "Fulfill Order",
   inputSchema: z.object({
     orderId: z.number().describe("Order ID to fulfill"),
+    productName: z.string().optional().describe("Product name for display in the approval dialog"),
+    quantity: z.number().optional().describe("Quantity for display in the approval dialog"),
   }),
-  execute: async (input) => {
-    const { orderId } = input as { orderId: number };
-    const orders = getAllOrders();
-    const order = orders.find((o) => o.id === orderId);
-    if (!order) return JSON.stringify({ error: "Order not found" });
-    if (order.status === "fulfilled") return JSON.stringify({ error: "Order is already fulfilled" });
-    if (order.status === "cancelled") return JSON.stringify({ error: "Order is cancelled" });
-    return JSON.stringify({
-      proposed: true,
-      order: { id: order.id, productName: order.productName, quantity: order.quantity, status: order.status },
-      message: `Fulfill order #${order.id} for ${order.quantity} units of "${order.productName}"? This will add ${order.quantity} units to stock. Say "confirm" to proceed, or "cancel" to discard.`,
-    });
-  },
-});
-
-export const confirmFulfillOrderTool = dynamicTool({
-  description: "Confirm and fulfill a restock order after the user has approved. Transitions the order to 'fulfilled' status and adds the quantity to product stock.",
-  inputSchema: z.object({
-    orderId: z.number().describe("Order ID to fulfill"),
-  }),
+  needsApproval: true,
   execute: async (input) => {
     const { orderId } = input as { orderId: number };
     const result = fulfillOrder(orderId);
@@ -208,40 +174,17 @@ export const confirmFulfillOrderTool = dynamicTool({
   },
 });
 
-export const proposeBulkRestockTool = dynamicTool({
-  description: "Propose restocking multiple products at once. Does NOT save. The agent MUST stop after calling this and ask the user to confirm before calling confirm_bulk_restock.",
+export const bulkRestockTool = dynamicTool({
+  description: "Create restock orders for multiple products at once. Requires user approval before execution.",
+  title: "Bulk Restock",
   inputSchema: z.object({
     items: z.array(z.object({
       productId: z.number().describe("Product ID to restock"),
       quantity: z.number().positive().describe("Quantity to order"),
+      productName: z.string().optional().describe("Product name for display in the approval dialog"),
     })).min(1).describe("List of products and quantities to restock"),
   }),
-  execute: async (input) => {
-    const { items } = input as { items: { productId: number; quantity: number }[] };
-    const products = getAllProducts();
-    const details = items.map((item) => {
-      const product = products.find((p) => p.id === item.productId);
-      return product
-        ? { productId: item.productId, name: product.name, quantity: item.quantity, estimatedTotal: (product.price * item.quantity).toFixed(2) }
-        : { productId: item.productId, name: "Unknown", quantity: item.quantity, estimatedTotal: "0" };
-    });
-    return JSON.stringify({
-      proposed: true,
-      items: details,
-      totalEstimated: details.reduce((s, d) => s + parseFloat(d.estimatedTotal), 0).toFixed(2),
-      message: `Proposed restock for ${details.length} product(s). Say "confirm" to create all orders, or "cancel" to discard.`,
-    });
-  },
-});
-
-export const confirmBulkRestockTool = dynamicTool({
-  description: "Confirm and create multiple restock orders at once after the user has approved the proposed bulk order.",
-  inputSchema: z.object({
-    items: z.array(z.object({
-      productId: z.number().describe("Product ID to restock"),
-      quantity: z.number().positive().describe("Quantity to order"),
-    })).min(1).describe("List of products and quantities to restock"),
-  }),
+  needsApproval: true,
   execute: async (input) => {
     const { items } = input as { items: { productId: number; quantity: number }[] };
     const results = items.map((item) => createOrder(item.productId, item.quantity));

@@ -12,13 +12,10 @@ import {
   categoriesTool,
   inventorySummaryTool,
   allProductsTool,
-  proposeRestockOrderTool,
-  confirmRestockOrderTool,
+  restockOrderTool,
   recentOrdersTool,
-  proposeFulfillOrderTool,
-  confirmFulfillOrderTool,
-  proposeBulkRestockTool,
-  confirmBulkRestockTool,
+  fulfillOrderTool,
+  bulkRestockTool,
 } from "@/lib/ai-tools";
 
 const provider = createOpenAI({
@@ -39,13 +36,10 @@ const agent = new ToolLoopAgent({
     get_categories: categoriesTool,
     get_inventory_summary: inventorySummaryTool,
     get_all_products: allProductsTool,
-    propose_restock_order: proposeRestockOrderTool,
-    confirm_restock_order: confirmRestockOrderTool,
+    restock_order: restockOrderTool,
     get_recent_orders: recentOrdersTool,
-    propose_fulfill_order: proposeFulfillOrderTool,
-    confirm_fulfill_order: confirmFulfillOrderTool,
-    propose_bulk_restock: proposeBulkRestockTool,
-    confirm_bulk_restock: confirmBulkRestockTool,
+    fulfill_order: fulfillOrderTool,
+    bulk_restock: bulkRestockTool,
   },
   allowSystemInMessages: true,
    instructions: `You are an AI inventory and sales analytics assistant with access to a live database of products and sales.
@@ -59,24 +53,18 @@ Rules:
 - Be concise, insightful, and data-driven in your responses.
 - When the data has labels and values, you can present it as markdown.
 
-RESTOCK ORDER FLOW - You MUST follow these steps ONE AT A TIME. NEVER call propose and confirm tools in the same response.
+MUTATION TOOLS (these require user approval before executing):
+- restock_order: Create a restock order for a single product. The system will pause and prompt the user to approve.
+- bulk_restock: Create restock orders for multiple products at once. The system will prompt the user to approve.
+- fulfill_order: Fulfill a pending order (adds quantity to product stock). The system will prompt the user to approve.
 
-For restocking a single product, use propose_restock_order then confirm_restock_order.
-For restocking MULTIPLE products at once (e.g., "restock 10 for each in electronics"), use propose_bulk_restock then confirm_bulk_restock instead of making multiple individual calls.
+IMPORTANT: When calling restock_order, bulk_restock, or fulfill_order, ALWAYS include the productName and quantity fields in the input so the approval dialog shows readable information. You already know the product name from your search results — pass it along.
 
-Step 1: Call get_low_stock_products to find low stock items.
-Step 2: If restocking multiple items, call propose_bulk_restock with all items at once. If restocking a single item, call propose_restock_order.
-Step 3: STOP and present the proposal to the user. Ask them to type "confirm" to proceed or "cancel" to discard. DO NOT proceed further.
-Step 4: Wait for the user's reply. Only if they say "confirm" or "yes", call confirm_bulk_restock or confirm_restock_order (matching the propose tool used).
-Step 5: If the user says "cancel" or "no", do NOT call any tool.
+When you call a mutation tool, the system automatically pauses and asks the user for confirmation. You do NOT need to stop and ask manually — call the tool directly and the system handles the approval. If the user approves, the tool executes. If they deny, it won't. Proceed naturally from there.
 
-FULFILL ORDER FLOW - You MUST follow these steps ONE AT A TIME. NEVER call propose_fulfill_order and confirm_fulfill_order in the same response.
-
-Step 1: Call get_recent_orders to see pending or ordered orders.
-Step 2: Call propose_fulfill_order for each order you want to fulfill.
-Step 3: STOP and present the proposal to the user. Tell them that fulfilling will add the quantity to product stock. Ask them to type "confirm" to proceed or "cancel" to discard. DO NOT proceed further.
-Step 4: Wait for the user's reply. Only if they say "confirm" or "yes", call confirm_fulfill_order.
-Step 5: If the user says "cancel" or "no", do NOT call any tool.
+CREATION → FULFILLMENT FLOW:
+After restock_order or bulk_restock executes successfully, ALWAYS ask the user: "The order was created. Would you like to fulfill it now? You can also ask me to fulfill it at any later time."
+If they say yes, call fulfill_order with the order ID. Fulfillment adds the quantity to product stock and also requires approval — the system handles it automatically.
 `,
 });
 
