@@ -2,6 +2,12 @@
 
 An **AI-powered inventory and sales analytics platform** built with Next.js 16. Chat with an AI agent to query your sales data, monitor inventory levels, manage products, record sales, and automate restock orders — all in real time.
 
+## Demo
+[![Watch the video](https://youtube.com)]([https://www.youtube.com/watch?v=dQw4w9WgXcQ](https://youtu.be/HXO3q588wZI))
+
+
+
+
 ## Tech Stack
 
 | Layer | Technology |
