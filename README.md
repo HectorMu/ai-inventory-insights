@@ -4,8 +4,9 @@ An **AI-powered inventory and sales analytics platform** built with Next.js 16. 
 
 ## Demo
 
-<iframe width="560" height="315" src="https://youtu.be/HXO3q588wZI" frameborder="0" allowfullscreen></iframe>
-
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=HXO3q588wZI" target="_blank">
+ <img src="http://img.youtube.com/vi/HXO3q588wZI/mqdefault.jpg" alt="Watch the video" width="240" height="180" border="10" />
+</a>
 
 
 
